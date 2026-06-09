@@ -42,6 +42,7 @@ class ScopeEnum(str, enum.Enum):
     sessions_read = "sessions:read"
     sessions_write = "sessions:write"
     agents_read = "agents:read"
+    agents_write = "agents:write"
 
 
 class ActionStatus(str, enum.Enum):
@@ -54,6 +55,12 @@ class DeliveryStatus(str, enum.Enum):
     pending = "pending"
     success = "success"
     failed = "failed"
+
+
+class AgentStatusEnum(str, enum.Enum):
+    idle = "idle"
+    working = "working"
+    error = "error"
 
 
 class SessionStatus(str, enum.Enum):
@@ -115,6 +122,17 @@ class Agent(Base):
     config: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, server_default="{}")
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), nullable=False, server_default=func.now()
+    )
+    status: Mapped[AgentStatusEnum] = mapped_column(
+        SAEnum(AgentStatusEnum, name="agent_status_enum"),
+        nullable=False,
+        server_default=AgentStatusEnum.idle.value,
+    )
+    status_updated_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False, server_default=func.now()
+    )
+    current_session_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True
     )
 
 

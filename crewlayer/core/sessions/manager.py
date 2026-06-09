@@ -5,10 +5,11 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from crewlayer.core.agents.status import apply_status
 from crewlayer.core.memory.extractor import extract_and_save
 from crewlayer.core.memory.long import LongMemory
 from crewlayer.core.memory.short import ShortMemory
-from crewlayer.db.models import Session, SessionStatus
+from crewlayer.db.models import Agent, AgentStatusEnum, Session, SessionStatus
 
 
 class SessionNotFoundError(Exception):
@@ -31,13 +32,25 @@ class SessionManager:
         agent_id: uuid.UUID,
         metadata: dict[str, Any] | None = None,
     ) -> Session:
-        """Create a new active session and flush (caller commits)."""
+        """Create a new active session and flush (caller commits).
+
+        Also marks the agent as working and sets its current_session_id.
+        """
         session = Session(
             tenant_id=tenant_id,
             agent_id=agent_id,
             metadata_=metadata or {},
         )
         self._db.add(session)
+        await self._db.flush()  # get session.id
+
+        agent_result = await self._db.execute(
+            select(Agent).where(Agent.id == agent_id)
+        )
+        agent = agent_result.scalar_one_or_none()
+        if agent is not None:
+            apply_status(agent, AgentStatusEnum.working, session.id)
+
         await self._db.flush()
         return session
 
@@ -101,6 +114,14 @@ class SessionManager:
         sess.status = SessionStatus.closed
         sess.closed_at = datetime.now(UTC)
         sess.message_count = memory_count
+
+        agent_result = await self._db.execute(
+            select(Agent).where(Agent.id == agent_id)
+        )
+        agent = agent_result.scalar_one_or_none()
+        if agent is not None:
+            apply_status(agent, AgentStatusEnum.idle, None)
+
         await self._db.flush()
         return sess
 

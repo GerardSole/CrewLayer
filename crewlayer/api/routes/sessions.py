@@ -8,11 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from crewlayer.api.deps import DbDep, RedisDep, TenantDep, check_scope
 from crewlayer.api.schemas.sessions import SessionCloseResponse, SessionCreate, SessionResponse
+from crewlayer.core.agents.status import cache_status
 from crewlayer.core.memory.short import ShortMemory
 from crewlayer.core.sessions.manager import SessionManager, SessionNotActiveError, SessionNotFoundError
 from crewlayer.core.streaming.broker import make_channel, publish as stream_publish
 from crewlayer.core.webhooks.dispatcher import dispatch
-from crewlayer.db.models import Agent, Memory, SessionStatus
+from crewlayer.db.models import Agent, AgentStatusEnum, Memory, SessionStatus
 
 router = APIRouter()
 
@@ -37,6 +38,7 @@ async def create_session(
     body: SessionCreate,
     tenant: TenantDep,
     db: DbDep,
+    redis: RedisDep,
 ) -> SessionResponse:
     """Create a new active session for an agent."""
     await _get_agent(body.agent_id, tenant.id, db)
@@ -44,6 +46,7 @@ async def create_session(
     sess = await mgr.create(tenant.id, body.agent_id, metadata=body.metadata)
     await db.commit()
     await db.refresh(sess)
+    await cache_status(body.agent_id, AgentStatusEnum.working, sess.id, sess.started_at, redis)
     return SessionResponse.from_orm(sess)
 
 
@@ -105,9 +108,13 @@ async def close_session(
     except SessionNotActiveError:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="La sesión no está activa")
 
+    agent_id_for_session = sess.agent_id
     message_count = sess.message_count
     await db.commit()
     await db.refresh(sess)
+
+    from datetime import UTC, datetime as _dt
+    await cache_status(agent_id_for_session, AgentStatusEnum.idle, None, sess.closed_at or _dt.now(UTC), redis)
 
     sm = ShortMemory(redis)
     await sm.clear(str(tenant.id), str(sess.agent_id), str(session_id))
