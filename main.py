@@ -6,8 +6,9 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from crewlayer.api.middleware.audit import AuditLogMiddleware
 from crewlayer.api.middleware.ratelimit import check_rate_limit
-from crewlayer.api.routes import actions, agents, auth, context, memory, sessions, streaming, usage, webhooks
+from crewlayer.api.routes import actions, agents, audit, auth, context, memory, sessions, streaming, usage, webhooks
 from crewlayer.core.context.blackboard import cleanup_expired
 from crewlayer.core.memory.decay import decay_importance
 from crewlayer.db.session import AsyncSessionLocal
@@ -63,6 +64,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(AuditLogMiddleware)
 
 app.include_router(auth.router, prefix="/v1", tags=["auth"])
 app.include_router(agents.router, prefix="/v1/agents", tags=["agents"])
@@ -73,6 +75,7 @@ app.include_router(webhooks.router, prefix="/v1", tags=["webhooks"])
 app.include_router(sessions.router, prefix="/v1", tags=["sessions"])
 app.include_router(streaming.router, prefix="/v1", tags=["streaming"])
 app.include_router(usage.router, prefix="/v1", tags=["usage"])
+app.include_router(audit.router, prefix="/v1", tags=["audit"])
 
 
 @app.get("/health", tags=["health"])

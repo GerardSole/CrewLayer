@@ -7,12 +7,14 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
+from crewlayer.api.middleware import audit as _audit_middleware
 from crewlayer.core.config import settings
 from crewlayer.core.redis import get_redis
 from crewlayer.db.models import (
     Action,
     Agent,
     ApiKey,
+    AuditLog,
     ContextEntry,
     Memory,
     Session,
@@ -29,7 +31,7 @@ _engine = create_async_engine(settings.DATABASE_URL, poolclass=NullPool)
 _TestSession = async_sessionmaker(_engine, expire_on_commit=False)
 
 # Deletion order respects FK constraints (children before parents)
-_CLEANUP_ORDER = [ApiKey, Action, ContextEntry, Memory, WebhookDelivery, WebhookEndpoint, Session, Agent, Tenant]
+_CLEANUP_ORDER = [AuditLog, ApiKey, Action, ContextEntry, Memory, WebhookDelivery, WebhookEndpoint, Session, Agent, Tenant]
 
 
 @pytest_asyncio.fixture
@@ -59,6 +61,11 @@ async def client(db: AsyncSession, redis_client: aioredis.Redis) -> AsyncGenerat
     async def _override_get_redis() -> AsyncGenerator[aioredis.Redis, None]:
         yield redis_client
 
+    # Redirect audit background tasks to the NullPool engine so they don't
+    # corrupt the pooled app engine between tests (Windows ProactorEventLoop).
+    _orig_session_local = _audit_middleware.AsyncSessionLocal
+    _audit_middleware.AsyncSessionLocal = _TestSession
+
     app.dependency_overrides[get_db] = _override_get_db
     app.dependency_overrides[get_redis] = _override_get_redis
     try:
@@ -69,6 +76,7 @@ async def client(db: AsyncSession, redis_client: aioredis.Redis) -> AsyncGenerat
         for model in _CLEANUP_ORDER:
             await db.execute(sa.delete(model))
         await db.commit()
+        _audit_middleware.AsyncSessionLocal = _orig_session_local
 
 
 @pytest_asyncio.fixture
@@ -86,6 +94,9 @@ async def streaming_client(redis_client: aioredis.Redis) -> AsyncGenerator[Async
     async def _override_get_redis() -> AsyncGenerator[aioredis.Redis, None]:
         yield redis_client
 
+    _orig_session_local = _audit_middleware.AsyncSessionLocal
+    _audit_middleware.AsyncSessionLocal = _TestSession
+
     app.dependency_overrides[get_db] = _override_get_db
     app.dependency_overrides[get_redis] = _override_get_redis
     try:
@@ -97,3 +108,4 @@ async def streaming_client(redis_client: aioredis.Redis) -> AsyncGenerator[Async
             for model in _CLEANUP_ORDER:
                 await cleanup_db.execute(sa.delete(model))
             await cleanup_db.commit()
+        _audit_middleware.AsyncSessionLocal = _orig_session_local

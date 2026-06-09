@@ -13,6 +13,13 @@ from crewlayer.core.security import verify_key
 from crewlayer.db.models import ApiKey, Tenant
 from crewlayer.db.session import get_db
 
+
+@dataclass
+class _AuditInfo:
+    tenant_id: uuid.UUID
+    api_key_id: uuid.UUID
+    actor_key_name: str
+
 _UNAUTHORIZED = HTTPException(
     status_code=status.HTTP_401_UNAUTHORIZED,
     detail="API key inválida o expirada",
@@ -43,6 +50,7 @@ class _AuthContext:
 
 
 async def _get_auth(
+    request: Request,
     db: AsyncSession = Depends(get_db),
     x_api_key: Annotated[str | None, Header()] = None,
 ) -> _AuthContext:
@@ -80,6 +88,13 @@ async def _get_auth(
     tenant: Tenant | None = tenant_result.scalar_one_or_none()
     if tenant is None:
         raise _UNAUTHORIZED
+
+    # Populate request state so the audit middleware can read it after the response
+    request.state.audit_info = _AuditInfo(
+        tenant_id=tenant.id,
+        api_key_id=api_key.id,
+        actor_key_name=api_key.name,
+    )
 
     return _AuthContext(tenant=tenant, api_key=api_key)
 
