@@ -22,9 +22,30 @@ from crewlayer.api.schemas.memory import (
 from crewlayer.core.memory.extractor import extract_and_save
 from crewlayer.core.memory.long import LongMemory
 from crewlayer.core.memory.short import ShortMemory
-from crewlayer.db.models import Agent, Memory
+from crewlayer.db.models import Agent, Memory, Session, SessionStatus
 
 router = APIRouter()
+
+
+async def _validate_session(
+    session_id_raw: str,
+    agent_id: uuid.UUID,
+    tenant_id: uuid.UUID,
+    db: AsyncSession,
+) -> None:
+    """Validate session_id if it is a UUID; non-UUID strings skip validation (backward compat)."""
+    try:
+        sid = uuid.UUID(session_id_raw)
+    except ValueError:
+        return
+    result = await db.execute(
+        select(Session).where(Session.id == sid, Session.tenant_id == tenant_id)
+    )
+    sess = result.scalar_one_or_none()
+    if sess is None or sess.agent_id != agent_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sesión no encontrada")
+    if sess.status != SessionStatus.active:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="La sesión no está activa")
 
 
 async def _get_agent(agent_id: uuid.UUID, tenant_id: uuid.UUID, db: AsyncSession) -> Agent:
@@ -52,6 +73,7 @@ async def append_message(
 ) -> ShortMemoryResponse:
     """Append a message to the agent's short-term (Redis) memory for a session."""
     await _get_agent(agent_id, tenant.id, db)
+    await _validate_session(session_id, agent_id, tenant.id, db)
     sm = ShortMemory(redis)
     await sm.append_message(str(tenant.id), str(agent_id), session_id, body.model_dump())
     messages_raw = await sm.get_messages(str(tenant.id), str(agent_id), session_id)

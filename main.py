@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from crewlayer.api.routes import actions, agents, auth, context, memory, webhooks
+from crewlayer.api.routes import actions, agents, auth, context, memory, sessions, webhooks
 from crewlayer.core.context.blackboard import cleanup_expired
 from crewlayer.db.session import AsyncSessionLocal
 
@@ -52,6 +52,7 @@ app.include_router(memory.router, prefix="/v1", tags=["memory"])
 app.include_router(actions.router, prefix="/v1", tags=["actions"])
 app.include_router(context.router, prefix="/v1/context", tags=["context"])
 app.include_router(webhooks.router, prefix="/v1", tags=["webhooks"])
+app.include_router(sessions.router, prefix="/v1", tags=["sessions"])
 
 
 @app.get("/health", tags=["health"])

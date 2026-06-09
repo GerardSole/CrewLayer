@@ -17,9 +17,28 @@ from crewlayer.api.schemas.actions import (
 )
 from crewlayer.core.actions.logger import ActionFilters, ActionLogger
 from crewlayer.core.webhooks.dispatcher import dispatch
-from crewlayer.db.models import ActionStatus, Agent
+from crewlayer.db.models import ActionStatus, Agent, Session, SessionStatus
 
 router = APIRouter()
+
+
+async def _validate_session(
+    session_id: uuid.UUID | None,
+    agent_id: uuid.UUID,
+    tenant_id: uuid.UUID,
+    db: AsyncSession,
+) -> None:
+    """If session_id is provided, verify it is active and belongs to this agent/tenant."""
+    if session_id is None:
+        return
+    result = await db.execute(
+        select(Session).where(Session.id == session_id, Session.tenant_id == tenant_id)
+    )
+    sess = result.scalar_one_or_none()
+    if sess is None or sess.agent_id != agent_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sesión no encontrada")
+    if sess.status != SessionStatus.active:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="La sesión no está activa")
 
 
 async def _get_agent(agent_id: uuid.UUID, tenant_id: uuid.UUID, db: AsyncSession) -> Agent:
@@ -45,6 +64,7 @@ async def log_action(
 ) -> ActionResponse:
     """Register an immutable action record for an agent."""
     await _get_agent(agent_id, tenant.id, db)
+    await _validate_session(body.session_id, agent_id, tenant.id, db)
     logger = ActionLogger(db)
     action = await logger.log(
         tenant_id=tenant.id,

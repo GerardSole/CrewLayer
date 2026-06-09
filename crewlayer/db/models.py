@@ -44,6 +44,12 @@ class DeliveryStatus(str, enum.Enum):
     failed = "failed"
 
 
+class SessionStatus(str, enum.Enum):
+    active = "active"
+    closed = "closed"
+    archived = "archived"
+
+
 class Tenant(Base):
     __tablename__ = "tenants"
 
@@ -176,6 +182,34 @@ class ContextEntry(Base):
     )
     updated_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+
+class Session(Base):
+    __tablename__ = "sessions"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    agent_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("agents.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    status: Mapped[SessionStatus] = mapped_column(
+        SAEnum(SessionStatus, name="session_status"),
+        nullable=False,
+        server_default=SessionStatus.active.value,
+    )
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    message_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    started_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False, server_default=func.now()
+    )
+    closed_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+    metadata_: Mapped[dict[str, Any]] = mapped_column(
+        "metadata", JSONB, nullable=False, server_default="{}"
     )
 
 
