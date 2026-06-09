@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import select
 
-from crewlayer.api.deps import DbDep, TenantDep
+from crewlayer.api.deps import DbDep, TenantDep, check_scope
 from crewlayer.db.models import Agent
 
 router = APIRouter()
@@ -37,13 +37,13 @@ async def create_agent(body: AgentCreate, tenant: TenantDep, db: DbDep) -> Agent
     return AgentResponse.model_validate(agent)
 
 
-@router.get("", response_model=list[AgentResponse])
+@router.get("", response_model=list[AgentResponse], dependencies=[check_scope("agents:read")])
 async def list_agents(tenant: TenantDep, db: DbDep) -> list[AgentResponse]:
     rows = (await db.execute(select(Agent).where(Agent.tenant_id == tenant.id))).scalars().all()
     return [AgentResponse.model_validate(a) for a in rows]
 
 
-@router.get("/{agent_id}", response_model=AgentResponse)
+@router.get("/{agent_id}", response_model=AgentResponse, dependencies=[check_scope("agents:read")])
 async def get_agent(agent_id: uuid.UUID, tenant: TenantDep, db: DbDep) -> AgentResponse:
     result = await db.execute(select(Agent).where(Agent.id == agent_id, Agent.tenant_id == tenant.id))
     agent = result.scalar_one_or_none()

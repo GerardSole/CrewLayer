@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from crewlayer.api.deps import DbDep, RedisDep, TenantDep
+from crewlayer.api.deps import DbDep, RedisDep, TenantDep, check_scope
 from crewlayer.core.webhooks.dispatcher import dispatch
 from crewlayer.api.schemas.memory import (
     ExtractRequest,
@@ -65,6 +65,7 @@ async def _get_agent(agent_id: uuid.UUID, tenant_id: uuid.UUID, db: AsyncSession
     "/agents/{agent_id}/memory/messages",
     status_code=status.HTTP_201_CREATED,
     response_model=ShortMemoryResponse,
+    dependencies=[check_scope("memory:write")],
 )
 async def append_message(
     agent_id: uuid.UUID,
@@ -100,6 +101,7 @@ async def append_message(
 @router.get(
     "/agents/{agent_id}/memory/messages",
     response_model=ShortMemoryResponse,
+    dependencies=[check_scope("memory:read")],
 )
 async def get_messages(
     agent_id: uuid.UUID,
@@ -123,6 +125,7 @@ async def get_messages(
 @router.post(
     "/agents/{agent_id}/memory/recall",
     response_model=RecallResponse,
+    dependencies=[check_scope("memory:read")],
 )
 async def recall(
     agent_id: uuid.UUID,
@@ -164,6 +167,7 @@ async def recall(
 @router.post(
     "/agents/{agent_id}/memory/extract",
     response_model=ExtractResponse,
+    dependencies=[check_scope("memory:write")],
 )
 async def extract(
     agent_id: uuid.UUID,
@@ -190,6 +194,7 @@ async def extract(
 @router.get(
     "/agents/{agent_id}/memory",
     response_model=MemoryListResponse,
+    dependencies=[check_scope("memory:read")],
 )
 async def list_memories(
     agent_id: uuid.UUID,
@@ -241,6 +246,7 @@ async def list_memories(
 @router.delete(
     "/agents/{agent_id}/memory/{memory_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[check_scope("memory:write")],
 )
 async def delete_memory(
     agent_id: uuid.UUID,
@@ -262,6 +268,7 @@ async def delete_memory(
 @router.get(
     "/agents/{agent_id}/memories/{memory_id}/history",
     response_model=MemoryHistoryResponse,
+    dependencies=[check_scope("memory:read")],
 )
 async def memory_history(
     agent_id: uuid.UUID,

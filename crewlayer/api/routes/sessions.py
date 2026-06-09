@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from crewlayer.api.deps import DbDep, RedisDep, TenantDep
+from crewlayer.api.deps import DbDep, RedisDep, TenantDep, check_scope
 from crewlayer.api.schemas.sessions import SessionCloseResponse, SessionCreate, SessionResponse
 from crewlayer.core.memory.short import ShortMemory
 from crewlayer.core.sessions.manager import SessionManager, SessionNotActiveError, SessionNotFoundError
@@ -31,6 +31,7 @@ async def _get_agent(agent_id: uuid.UUID, tenant_id: uuid.UUID, db: AsyncSession
     "/sessions",
     status_code=status.HTTP_201_CREATED,
     response_model=SessionResponse,
+    dependencies=[check_scope("sessions:write")],
 )
 async def create_session(
     body: SessionCreate,
@@ -49,6 +50,7 @@ async def create_session(
 @router.get(
     "/sessions",
     response_model=list[SessionResponse],
+    dependencies=[check_scope("sessions:read")],
 )
 async def list_sessions(
     tenant: TenantDep,
@@ -67,6 +69,7 @@ async def list_sessions(
 @router.get(
     "/sessions/{session_id}",
     response_model=SessionResponse,
+    dependencies=[check_scope("sessions:read")],
 )
 async def get_session(
     session_id: uuid.UUID,
@@ -85,6 +88,7 @@ async def get_session(
 @router.post(
     "/sessions/{session_id}/close",
     response_model=SessionCloseResponse,
+    dependencies=[check_scope("sessions:write")],
 )
 async def close_session(
     session_id: uuid.UUID,
@@ -155,6 +159,7 @@ async def close_session(
 @router.post(
     "/sessions/{session_id}/archive",
     response_model=SessionResponse,
+    dependencies=[check_scope("sessions:write")],
 )
 async def archive_session(
     session_id: uuid.UUID,

@@ -96,6 +96,7 @@ async def create_api_key(
         tenant_id=tenant.id,
         name=data.name,
         scopes=data.scopes,
+        agent_ids=data.agent_ids,
         key_hash=hash_key(raw_key),
         expires_at=data.expires_at,
     )
@@ -107,6 +108,7 @@ async def create_api_key(
         id=api_key.id,
         name=api_key.name,
         scopes=api_key.scopes,
+        agent_ids=api_key.agent_ids,
         last_used_at=api_key.last_used_at,
         expires_at=api_key.expires_at,
         key=raw_key,

@@ -1,8 +1,9 @@
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Annotated
+from typing import Annotated, Any
 
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, Request, status
 from redis.asyncio import Redis
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,13 +19,14 @@ _UNAUTHORIZED = HTTPException(
     headers={"WWW-Authenticate": "ApiKey"},
 )
 
+_FORBIDDEN = HTTPException(
+    status_code=status.HTTP_403_FORBIDDEN,
+    detail="Scope insuficiente para esta operación",
+)
+
 
 def _parse_key_id(raw_key: str) -> uuid.UUID | None:
-    """Extract the key's UUID from 'crwl_{uuid32hex}_{secret}' format.
-
-    Encoding the key ID in the key itself lets us do a direct DB lookup by PK
-    instead of scanning all rows and calling bcrypt on each one.
-    """
+    """Extract the key's UUID from 'crwl_{uuid32hex}_{secret}' format."""
     parts = raw_key.split("_", 2)
     if len(parts) != 3 or parts[0] != "crwl":
         return None
@@ -34,14 +36,19 @@ def _parse_key_id(raw_key: str) -> uuid.UUID | None:
         return None
 
 
-async def get_current_tenant(
+@dataclass
+class _AuthContext:
+    tenant: Tenant
+    api_key: ApiKey
+
+
+async def _get_auth(
     db: AsyncSession = Depends(get_db),
     x_api_key: Annotated[str | None, Header()] = None,
-) -> Tenant:
-    """Validate X-API-Key header and return the owning Tenant.
+) -> _AuthContext:
+    """Validate X-API-Key and return both Tenant and ApiKey.
 
-    Raises 401 for: missing header, malformed key, key not found,
-    wrong secret, or expired key.
+    FastAPI caches this per request, so TenantDep and ApiKeyDep share one DB round-trip.
     """
     if x_api_key is None:
         raise _UNAUTHORIZED
@@ -50,10 +57,9 @@ async def get_current_tenant(
     if key_id is None:
         raise _UNAUTHORIZED
 
-    result = await db.execute(select(ApiKey).where(ApiKey.id == key_id))
-    api_key = result.scalar_one_or_none()
+    key_result = await db.execute(select(ApiKey).where(ApiKey.id == key_id))
+    api_key: ApiKey | None = key_result.scalar_one_or_none()
 
-    # Always call verify to prevent timing attacks even when key is not found
     if api_key is None:
         raise _UNAUTHORIZED
 
@@ -67,20 +73,66 @@ async def get_current_tenant(
         if expires_at < datetime.now(UTC):
             raise _UNAUTHORIZED
 
-    # Track last usage — committed here so read-only routes update it too
     api_key.last_used_at = datetime.now(UTC)
     await db.commit()
 
-    result = await db.execute(select(Tenant).where(Tenant.id == api_key.tenant_id))
-    tenant = result.scalar_one_or_none()
+    tenant_result = await db.execute(select(Tenant).where(Tenant.id == api_key.tenant_id))
+    tenant: Tenant | None = tenant_result.scalar_one_or_none()
     if tenant is None:
         raise _UNAUTHORIZED
 
-    return tenant  # type: ignore[return-value]
+    return _AuthContext(tenant=tenant, api_key=api_key)
+
+
+async def get_current_tenant(auth: _AuthContext = Depends(_get_auth)) -> Tenant:
+    return auth.tenant
+
+
+async def get_current_api_key(auth: _AuthContext = Depends(_get_auth)) -> ApiKey:
+    return auth.api_key
+
+
+def check_scope(required_scope: str) -> Any:
+    """Return a FastAPI dependency that enforces a scope and optional agent_ids restriction.
+
+    Semantics:
+    - Empty scopes list on the key → full access (backward-compatible bootstrap keys).
+    - Non-empty scopes → only the listed scopes are permitted; anything else → 403.
+    - Non-empty agent_ids → the key may only operate on those specific agents;
+      routes with an {agent_id} path parameter are checked; routes without one are unrestricted.
+    """
+    async def _dep(
+        request: Request,
+        api_key: ApiKey = Depends(get_current_api_key),
+    ) -> None:
+        # Scope check: empty = full access
+        if api_key.scopes and required_scope not in api_key.scopes:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Scope requerido: '{required_scope}'",
+            )
+
+        # Agent restriction check
+        if api_key.agent_ids:
+            agent_id_str = request.path_params.get("agent_id")
+            if agent_id_str:
+                try:
+                    agent_id = uuid.UUID(str(agent_id_str))
+                except ValueError:
+                    pass
+                else:
+                    if agent_id not in api_key.agent_ids:
+                        raise HTTPException(
+                            status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Esta API key no tiene acceso a este agente",
+                        )
+
+    return Depends(_dep)
 
 
 # Annotated shortcuts for use in route signatures:
 #   async def route(tenant: TenantDep, db: DbDep, redis: RedisDep): ...
 TenantDep = Annotated[Tenant, Depends(get_current_tenant)]
+ApiKeyDep = Annotated[ApiKey, Depends(get_current_api_key)]
 DbDep = Annotated[AsyncSession, Depends(get_db)]
 RedisDep = Annotated[Redis, Depends(get_redis)]

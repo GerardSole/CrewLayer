@@ -23,7 +23,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse, ServerSentEvent  # type: ignore[attr-defined]
 
-from crewlayer.api.deps import DbDep, RedisDep, TenantDep
+from crewlayer.api.deps import DbDep, RedisDep, TenantDep, check_scope
 from crewlayer.core.streaming.broker import make_channel
 from crewlayer.db.models import Agent, Session, SessionStatus
 
@@ -58,7 +58,7 @@ async def _get_session(
     return sess
 
 
-@router.get("/agents/{agent_id}/sessions/{session_id}/stream")
+@router.get("/agents/{agent_id}/sessions/{session_id}/stream", dependencies=[check_scope("sessions:read")])
 async def stream_session(
     agent_id: uuid.UUID,
     session_id: uuid.UUID,

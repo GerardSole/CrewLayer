@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from crewlayer.api.deps import DbDep, TenantDep
+from crewlayer.api.deps import DbDep, TenantDep, check_scope
 from crewlayer.api.schemas.actions import (
     ActionCreate,
     ActionListResponse,
@@ -55,6 +55,7 @@ async def _get_agent(agent_id: uuid.UUID, tenant_id: uuid.UUID, db: AsyncSession
     "/agents/{agent_id}/actions",
     status_code=status.HTTP_201_CREATED,
     response_model=ActionResponse,
+    dependencies=[check_scope("actions:write")],
 )
 async def log_action(
     agent_id: uuid.UUID,
@@ -96,6 +97,7 @@ async def log_action(
 @router.get(
     "/agents/{agent_id}/actions/stats",
     response_model=ActionStatsResponse,
+    dependencies=[check_scope("actions:read")],
 )
 async def get_stats(
     agent_id: uuid.UUID,
@@ -125,6 +127,7 @@ async def get_stats(
 @router.get(
     "/agents/{agent_id}/actions/{action_id}",
     response_model=ActionResponse,
+    dependencies=[check_scope("actions:read")],
 )
 async def get_action(
     agent_id: uuid.UUID,
@@ -146,6 +149,7 @@ async def get_action(
 @router.get(
     "/agents/{agent_id}/actions",
     response_model=ActionListResponse,
+    dependencies=[check_scope("actions:read")],
 )
 async def list_actions(
     agent_id: uuid.UUID,

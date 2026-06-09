@@ -32,6 +32,18 @@ class PlanEnum(str, enum.Enum):
     enterprise = "enterprise"
 
 
+class ScopeEnum(str, enum.Enum):
+    memory_read = "memory:read"
+    memory_write = "memory:write"
+    actions_read = "actions:read"
+    actions_write = "actions:write"
+    context_read = "context:read"
+    context_write = "context:write"
+    sessions_read = "sessions:read"
+    sessions_write = "sessions:write"
+    agents_read = "agents:read"
+
+
 class ActionStatus(str, enum.Enum):
     success = "success"
     error = "error"
@@ -81,6 +93,9 @@ class ApiKey(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     scopes: Mapped[list[str]] = mapped_column(
         ARRAY(String), nullable=False, server_default="{}"
+    )
+    agent_ids: Mapped[list[uuid.UUID]] = mapped_column(
+        ARRAY(UUID(as_uuid=True)), nullable=False, server_default="{}"
     )
     last_used_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
     expires_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)

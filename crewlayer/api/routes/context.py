@@ -2,7 +2,7 @@ import asyncio
 
 from fastapi import APIRouter, HTTPException, status
 
-from crewlayer.api.deps import DbDep, TenantDep
+from crewlayer.api.deps import DbDep, TenantDep, check_scope
 from crewlayer.core.webhooks.dispatcher import dispatch
 from crewlayer.api.schemas.context import (
     ContextEntryResponse,
@@ -17,6 +17,7 @@ router = APIRouter()
 @router.put(
     "/{namespace}/{key}",
     response_model=ContextEntryResponse,
+    dependencies=[check_scope("context:write")],
 )
 async def write_entry(
     namespace: str,
@@ -58,6 +59,7 @@ async def write_entry(
 @router.get(
     "/{namespace}/{key}",
     response_model=ContextEntryResponse,
+    dependencies=[check_scope("context:read")],
 )
 async def read_entry(
     namespace: str,
@@ -76,6 +78,7 @@ async def read_entry(
 @router.get(
     "/{namespace}",
     response_model=ContextNamespaceResponse,
+    dependencies=[check_scope("context:read")],
 )
 async def list_namespace(
     namespace: str,
@@ -95,6 +98,7 @@ async def list_namespace(
 @router.delete(
     "/{namespace}/{key}",
     status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[check_scope("context:write")],
 )
 async def delete_entry(
     namespace: str,
