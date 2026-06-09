@@ -130,6 +130,9 @@ class Memory(Base):
     last_accessed: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
     access_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     tags: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=False, server_default="{}")
+    merged_from: Mapped[list[uuid.UUID]] = mapped_column(
+        ARRAY(UUID(as_uuid=True)), nullable=False, server_default="{}"
+    )
     deleted_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
 
 

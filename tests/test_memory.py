@@ -160,9 +160,12 @@ async def test_recall_empty_when_no_memories(client: AsyncClient, mocker) -> Non
 # ---------------------------------------------------------------------------
 
 async def test_extract_persists_multiple_facts(client: AsyncClient, mocker) -> None:
+    # Each fact gets a distinct embedding so no merge is triggered
+    _embed_a = [1.0] + [0.0] * 1535
+    _embed_b = [0.0, 1.0] + [0.0] * 1534
     mocker.patch(
         "crewlayer.core.memory.long.get_embedding",
-        new=AsyncMock(return_value=_FAKE_EMBEDDING),
+        new=AsyncMock(side_effect=[_embed_a, _embed_b]),
     )
     _, agent, headers = await _setup(client)
 
@@ -221,9 +224,13 @@ async def test_extract_handles_invalid_json_gracefully(client: AsyncClient, mock
 # ---------------------------------------------------------------------------
 
 async def test_list_memories_paginated(client: AsyncClient, mocker) -> None:
+    # Use three orthogonal unit vectors so no pair triggers the dedup merge path
+    _e0 = [1.0] + [0.0] * 1535
+    _e1 = [0.0, 1.0] + [0.0] * 1534
+    _e2 = [0.0, 0.0, 1.0] + [0.0] * 1533
     mocker.patch(
         "crewlayer.core.memory.long.get_embedding",
-        new=AsyncMock(return_value=_FAKE_EMBEDDING),
+        new=AsyncMock(side_effect=[_e0, _e1, _e2]),
     )
     _, agent, headers = await _setup(client)
 

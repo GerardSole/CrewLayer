@@ -11,6 +11,8 @@ from crewlayer.core.webhooks.dispatcher import dispatch
 from crewlayer.api.schemas.memory import (
     ExtractRequest,
     ExtractResponse,
+    MemoryHistoryEntry,
+    MemoryHistoryResponse,
     MemoryListResponse,
     MemoryResponse,
     MessageIn,
@@ -150,6 +152,7 @@ async def recall(
                 importance=mem.importance,
                 base_importance=mem.base_importance,
                 tags=mem.tags,
+                merged_from=mem.merged_from,
                 created_at=mem.created_at,
                 similarity=sim,
             )
@@ -224,6 +227,7 @@ async def list_memories(
                 importance=m.importance,
                 base_importance=m.base_importance,
                 tags=m.tags,
+                merged_from=m.merged_from,
                 created_at=m.created_at,
             )
             for m in rows
@@ -253,3 +257,69 @@ async def delete_memory(
             status_code=status.HTTP_404_NOT_FOUND, detail="Memoria no encontrada"
         )
     await db.commit()
+
+
+@router.get(
+    "/agents/{agent_id}/memories/{memory_id}/history",
+    response_model=MemoryHistoryResponse,
+)
+async def memory_history(
+    agent_id: uuid.UUID,
+    memory_id: uuid.UUID,
+    tenant: TenantDep,
+    db: DbDep,
+) -> MemoryHistoryResponse:
+    """Return the merge lineage of a memory as a list sorted oldest-to-newest.
+
+    BFS through merged_from chains, including soft-deleted ancestors.
+    """
+    await _get_agent(agent_id, tenant.id, db)
+
+    # Verify the root memory belongs to this agent/tenant
+    root_result = await db.execute(
+        select(Memory).where(
+            Memory.id == memory_id,
+            Memory.agent_id == agent_id,
+            Memory.tenant_id == tenant.id,
+        )
+    )
+    root = root_result.scalar_one_or_none()
+    if root is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Memoria no encontrada")
+
+    # BFS to collect all ancestors (including soft-deleted)
+    visited: dict[uuid.UUID, Memory] = {}
+    queue: list[uuid.UUID] = list(root.merged_from)
+
+    while queue:
+        batch_ids = [mid for mid in queue if mid not in visited]
+        if not batch_ids:
+            break
+        rows = (
+            await db.execute(select(Memory).where(Memory.id.in_(batch_ids)))
+        ).scalars().all()
+        queue = []
+        for mem in rows:
+            visited[mem.id] = mem
+            for parent_id in mem.merged_from:
+                if parent_id not in visited:
+                    queue.append(parent_id)
+
+    lineage = sorted(visited.values(), key=lambda m: m.created_at)
+    lineage.append(root)
+
+    return MemoryHistoryResponse(
+        memory_id=memory_id,
+        lineage=[
+            MemoryHistoryEntry(
+                id=m.id,
+                content=m.content,
+                importance=m.importance,
+                base_importance=m.base_importance,
+                merged_from=m.merged_from,
+                created_at=m.created_at,
+                deleted_at=m.deleted_at,
+            )
+            for m in lineage
+        ],
+    )

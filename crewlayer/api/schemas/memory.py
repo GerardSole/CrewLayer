@@ -37,6 +37,7 @@ class MemoryResponse(BaseModel):
     importance: float
     base_importance: float
     tags: list[str]
+    merged_from: list[uuid.UUID] = Field(default_factory=list)
     created_at: datetime
     similarity: float | None = None
 
@@ -63,3 +64,20 @@ class MemoryListResponse(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+class MemoryHistoryEntry(BaseModel):
+    id: uuid.UUID
+    content: str
+    importance: float
+    base_importance: float
+    merged_from: list[uuid.UUID]
+    created_at: datetime
+    deleted_at: datetime | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class MemoryHistoryResponse(BaseModel):
+    memory_id: uuid.UUID
+    lineage: list[MemoryHistoryEntry]

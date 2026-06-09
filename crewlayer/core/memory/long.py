@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from crewlayer.core.config import settings
 from crewlayer.core.embeddings.client import get_embedding
+from crewlayer.core.memory.merger import call_claude_merge, find_near_duplicate
 from crewlayer.db.models import Memory
 
 
@@ -31,8 +32,39 @@ class LongMemory:
         tags: list[str] | None = None,
         summary: str | None = None,
     ) -> Memory:
-        """Embed and persist a new memory, returning the flushed (not yet committed) row."""
+        """Embed and persist a new memory, merging with any near-duplicate found.
+
+        If an existing memory exceeds the cosine-similarity threshold (0.90), Claude
+        consolidates both into a single richer memory.  The original is soft-deleted
+        and the merged result carries merged_from = [original.id].
+        """
         vector = await get_embedding(content, self._redis)
+
+        duplicate = await find_near_duplicate(self._db, tenant_id, agent_id, vector)
+        if duplicate is not None:
+            merged_content = await call_claude_merge(duplicate.content, content)
+            merged_base = max(duplicate.base_importance, importance)
+            merged_tags = list({*duplicate.tags, *(tags or [])})
+            merged_vector = await get_embedding(merged_content, self._redis)
+
+            duplicate.deleted_at = datetime.now(UTC)
+
+            merged = Memory(
+                tenant_id=tenant_id,
+                agent_id=agent_id,
+                content=merged_content,
+                embedding=merged_vector,
+                importance=merged_base,
+                base_importance=merged_base,
+                access_count=duplicate.access_count,
+                last_accessed=duplicate.last_accessed,
+                tags=merged_tags,
+                merged_from=[duplicate.id],
+            )
+            self._db.add(merged)
+            await self._db.flush()
+            return merged
+
         memory = Memory(
             tenant_id=tenant_id,
             agent_id=agent_id,
