@@ -63,6 +63,11 @@ class AgentStatusEnum(str, enum.Enum):
     error = "error"
 
 
+class MemoryStatusEnum(str, enum.Enum):
+    active = "active"
+    archived = "archived"
+
+
 class SessionStatus(str, enum.Enum):
     active = "active"
     closed = "closed"
@@ -167,6 +172,11 @@ class Memory(Base):
         ARRAY(UUID(as_uuid=True)), nullable=False, server_default="{}"
     )
     deleted_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+    status: Mapped[MemoryStatusEnum] = mapped_column(
+        SAEnum(MemoryStatusEnum, name="memory_status_enum"),
+        nullable=False,
+        server_default=MemoryStatusEnum.active.value,
+    )
 
 
 class Action(Base):

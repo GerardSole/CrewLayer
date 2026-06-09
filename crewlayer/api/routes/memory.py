@@ -9,12 +9,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from crewlayer.api.deps import DbDep, RedisDep, TenantDep, check_scope
 from crewlayer.core.webhooks.dispatcher import dispatch
 from crewlayer.api.schemas.memory import (
+    ArchiveRequest,
+    ArchiveResponse,
     ExtractRequest,
     ExtractResponse,
     MemoryHistoryEntry,
     MemoryHistoryResponse,
     MemoryListResponse,
+    MemoryMiniResponse,
     MemoryResponse,
+    MemoryStatsResponse,
     MessageIn,
     MessageOut,
     RecallRequest,
@@ -25,7 +29,7 @@ from crewlayer.core.memory.extractor import extract_and_save
 from crewlayer.core.memory.long import LongMemory
 from crewlayer.core.memory.short import ShortMemory
 from crewlayer.core.streaming.broker import make_channel, publish as stream_publish
-from crewlayer.db.models import Agent, Memory, Session, SessionStatus
+from crewlayer.db.models import Agent, Memory, MemoryStatusEnum, Session, SessionStatus
 
 router = APIRouter()
 
@@ -192,6 +196,117 @@ async def extract(
 
 
 @router.get(
+    "/agents/{agent_id}/memories/stats",
+    response_model=MemoryStatsResponse,
+    dependencies=[check_scope("memory:read")],
+)
+async def memory_stats(
+    agent_id: uuid.UUID,
+    tenant: TenantDep,
+    db: DbDep,
+) -> MemoryStatsResponse:
+    """Return aggregate statistics for an agent's memories."""
+    await _get_agent(agent_id, tenant.id, db)
+
+    base_filter = [
+        Memory.agent_id == agent_id,
+        Memory.tenant_id == tenant.id,
+        Memory.deleted_at.is_(None),
+    ]
+
+    # Count by status in a single query
+    count_rows = (
+        await db.execute(
+            select(Memory.status, func.count(Memory.id))
+            .where(*base_filter)
+            .group_by(Memory.status)
+        )
+    ).all()
+    count_map: dict = {row[0]: row[1] for row in count_rows}
+    total_active = count_map.get(MemoryStatusEnum.active, 0)
+    total_archived = count_map.get(MemoryStatusEnum.archived, 0)
+
+    # Average importance across active memories
+    avg_val = (
+        await db.execute(
+            select(func.avg(Memory.importance)).where(
+                *base_filter, Memory.status == MemoryStatusEnum.active
+            )
+        )
+    ).scalar_one_or_none()
+    avg_importance = round(float(avg_val or 0.0), 6)
+
+    # Oldest active memory
+    oldest = (
+        await db.execute(
+            select(Memory)
+            .where(*base_filter, Memory.status == MemoryStatusEnum.active)
+            .order_by(Memory.created_at.asc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+
+    # Most accessed active memory
+    most_accessed = (
+        await db.execute(
+            select(Memory)
+            .where(*base_filter, Memory.status == MemoryStatusEnum.active)
+            .order_by(Memory.access_count.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+
+    return MemoryStatsResponse(
+        total_active=total_active,
+        total_archived=total_archived,
+        avg_importance=avg_importance,
+        oldest_memory=MemoryMiniResponse.model_validate(oldest) if oldest else None,
+        most_accessed_memory=MemoryMiniResponse.model_validate(most_accessed) if most_accessed else None,
+    )
+
+
+@router.post(
+    "/agents/{agent_id}/memories/archive",
+    response_model=ArchiveResponse,
+    dependencies=[check_scope("memory:write")],
+)
+async def force_archive(
+    agent_id: uuid.UUID,
+    body: ArchiveRequest,
+    tenant: TenantDep,
+    db: DbDep,
+) -> ArchiveResponse:
+    """Immediately archive all active memories whose importance is below the threshold.
+
+    Uses the tenant's ``memory_forget_threshold`` setting by default (0.05).
+    Pass ``threshold`` in the request body to override for this call.
+    """
+    await _get_agent(agent_id, tenant.id, db)
+
+    threshold = body.threshold
+    if threshold is None:
+        threshold = float(tenant.settings.get("memory_forget_threshold", 0.05))
+
+    rows = (
+        await db.execute(
+            select(Memory).where(
+                Memory.agent_id == agent_id,
+                Memory.tenant_id == tenant.id,
+                Memory.deleted_at.is_(None),
+                Memory.status == MemoryStatusEnum.active,
+                Memory.importance < threshold,
+            )
+        )
+    ).scalars().all()
+
+    for mem in rows:
+        mem.status = MemoryStatusEnum.archived
+
+    await db.commit()
+    return ArchiveResponse(archived_count=len(rows))
+
+
+@router.get(
     "/agents/{agent_id}/memory",
     response_model=MemoryListResponse,
     dependencies=[check_scope("memory:read")],
@@ -202,8 +317,13 @@ async def list_memories(
     db: DbDep,
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 20,
+    include_archived: Annotated[bool, Query()] = False,
 ) -> MemoryListResponse:
-    """List all non-deleted long-term memories for an agent, paginated."""
+    """List non-deleted long-term memories for an agent, paginated.
+
+    By default only active memories are returned.  Pass
+    ``include_archived=true`` to also include archived ones.
+    """
     await _get_agent(agent_id, tenant.id, db)
 
     base = select(Memory).where(
@@ -211,6 +331,9 @@ async def list_memories(
         Memory.tenant_id == tenant.id,
         Memory.deleted_at.is_(None),
     )
+    if not include_archived:
+        base = base.where(Memory.status == MemoryStatusEnum.active)
+
     total_result = await db.execute(select(func.count()).select_from(base.subquery()))
     total: int = total_result.scalar_one()
 
@@ -223,20 +346,7 @@ async def list_memories(
     ).scalars().all()
 
     return MemoryListResponse(
-        items=[
-            MemoryResponse(
-                id=m.id,
-                agent_id=m.agent_id,
-                content=m.content,
-                summary=m.summary,
-                importance=m.importance,
-                base_importance=m.base_importance,
-                tags=m.tags,
-                merged_from=m.merged_from,
-                created_at=m.created_at,
-            )
-            for m in rows
-        ],
+        items=[MemoryResponse.model_validate(m) for m in rows],
         total=total,
         page=page,
         page_size=page_size,

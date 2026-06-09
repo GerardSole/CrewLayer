@@ -39,6 +39,7 @@ class MemoryResponse(BaseModel):
     tags: list[str]
     merged_from: list[uuid.UUID] = Field(default_factory=list)
     created_at: datetime
+    status: str = "active"
     similarity: float | None = None
 
     model_config = {"from_attributes": True}
@@ -81,3 +82,38 @@ class MemoryHistoryEntry(BaseModel):
 class MemoryHistoryResponse(BaseModel):
     memory_id: uuid.UUID
     lineage: list[MemoryHistoryEntry]
+
+
+# ---------------------------------------------------------------------------
+# Memory stats and archival
+# ---------------------------------------------------------------------------
+
+class MemoryMiniResponse(BaseModel):
+    id: uuid.UUID
+    content: str
+    importance: float
+    created_at: datetime
+    access_count: int
+
+    model_config = {"from_attributes": True}
+
+
+class MemoryStatsResponse(BaseModel):
+    total_active: int
+    total_archived: int
+    avg_importance: float
+    oldest_memory: MemoryMiniResponse | None = None
+    most_accessed_memory: MemoryMiniResponse | None = None
+
+
+class ArchiveRequest(BaseModel):
+    threshold: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Override the tenant's memory_forget_threshold for this request.",
+    )
+
+
+class ArchiveResponse(BaseModel):
+    archived_count: int

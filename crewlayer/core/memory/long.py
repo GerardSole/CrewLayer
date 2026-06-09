@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from crewlayer.core.config import settings
 from crewlayer.core.embeddings.client import get_embedding
 from crewlayer.core.memory.merger import call_claude_merge, find_near_duplicate
-from crewlayer.db.models import Memory
+from crewlayer.db.models import Memory, MemoryStatusEnum
 
 
 class LongMemory:
@@ -107,6 +107,7 @@ class LongMemory:
                 Memory.tenant_id == tenant_id,
                 Memory.agent_id == agent_id,
                 Memory.deleted_at.is_(None),
+                Memory.status == MemoryStatusEnum.active,
                 Memory.embedding.isnot(None),
             )
             .order_by(Memory.embedding.cosine_distance(query_vec))

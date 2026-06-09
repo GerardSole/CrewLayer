@@ -2,6 +2,7 @@ import asyncio
 import contextlib
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime, timedelta
 
 import redis.asyncio as aioredis
 from fastapi import Depends, FastAPI
@@ -25,7 +26,7 @@ from crewlayer.api.routes import (
 )
 from crewlayer.core.config import settings
 from crewlayer.core.context.blackboard import cleanup_expired
-from crewlayer.core.memory.decay import decay_importance
+from crewlayer.core.memory.decay import decay_importance, forget_stale_memories
 from crewlayer.core.metrics.collectors import collect_metrics
 from crewlayer.core.streaming.context_broker import ContextBroker
 from crewlayer.db.session import AsyncSessionLocal
@@ -61,6 +62,26 @@ async def _metrics_loop() -> None:
         await asyncio.sleep(_METRICS_INTERVAL)
 
 
+def _next_3am_utc_delay() -> float:
+    """Seconds until the next 03:00 UTC."""
+    now = datetime.now(UTC)
+    candidate = now.replace(hour=3, minute=0, second=0, microsecond=0)
+    if candidate <= now:
+        candidate += timedelta(days=1)
+    return (candidate - now).total_seconds()
+
+
+async def _forget_loop() -> None:
+    """Background task: run forget_stale_memories daily at 03:00 UTC."""
+    await asyncio.sleep(_next_3am_utc_delay())
+    while True:
+        with contextlib.suppress(Exception):
+            async with AsyncSessionLocal() as db:
+                await forget_stale_memories(db)
+                await db.commit()
+        await asyncio.sleep(_next_3am_utc_delay())
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Dedicated Redis connection for the context pub/sub broker
@@ -70,18 +91,22 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     cleanup_task = asyncio.create_task(_cleanup_loop())
     decay_task = asyncio.create_task(_decay_loop())
     metrics_task = asyncio.create_task(_metrics_loop())
+    forget_task = asyncio.create_task(_forget_loop())
 
     yield
 
     cleanup_task.cancel()
     decay_task.cancel()
     metrics_task.cancel()
+    forget_task.cancel()
     with contextlib.suppress(asyncio.CancelledError):
         await cleanup_task
     with contextlib.suppress(asyncio.CancelledError):
         await decay_task
     with contextlib.suppress(asyncio.CancelledError):
         await metrics_task
+    with contextlib.suppress(asyncio.CancelledError):
+        await forget_task
 
     await app.state.context_broker.aclose()
     with contextlib.suppress(Exception):
