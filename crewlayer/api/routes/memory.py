@@ -22,6 +22,7 @@ from crewlayer.api.schemas.memory import (
 from crewlayer.core.memory.extractor import extract_and_save
 from crewlayer.core.memory.long import LongMemory
 from crewlayer.core.memory.short import ShortMemory
+from crewlayer.core.streaming.broker import make_channel, publish as stream_publish
 from crewlayer.db.models import Agent, Memory, Session, SessionStatus
 
 router = APIRouter()
@@ -75,7 +76,17 @@ async def append_message(
     await _get_agent(agent_id, tenant.id, db)
     await _validate_session(session_id, agent_id, tenant.id, db)
     sm = ShortMemory(redis)
-    await sm.append_message(str(tenant.id), str(agent_id), session_id, body.model_dump())
+    msg_data = body.model_dump()
+    await sm.append_message(str(tenant.id), str(agent_id), session_id, msg_data)
+    # Publish to SSE stream so live subscribers receive the message immediately
+    asyncio.create_task(
+        stream_publish(
+            redis,
+            make_channel(str(tenant.id), str(agent_id), session_id),
+            "message",
+            msg_data,
+        )
+    )
     messages_raw = await sm.get_messages(str(tenant.id), str(agent_id), session_id)
     return ShortMemoryResponse(
         session_id=session_id,

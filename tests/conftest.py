@@ -69,3 +69,31 @@ async def client(db: AsyncSession, redis_client: aioredis.Redis) -> AsyncGenerat
         for model in _CLEANUP_ORDER:
             await db.execute(sa.delete(model))
         await db.commit()
+
+
+@pytest_asyncio.fixture
+async def streaming_client(redis_client: aioredis.Redis) -> AsyncGenerator[AsyncClient, None]:
+    """ASGI test client for SSE streaming tests.
+
+    Each request gets its own DB session so concurrent SSE + REST calls don't
+    share a single asyncpg connection (which can't handle concurrent operations).
+    Cleanup is done in a separate session after the test.
+    """
+    async def _override_get_db() -> AsyncGenerator[AsyncSession, None]:
+        async with _TestSession() as session:
+            yield session
+
+    async def _override_get_redis() -> AsyncGenerator[aioredis.Redis, None]:
+        yield redis_client
+
+    app.dependency_overrides[get_db] = _override_get_db
+    app.dependency_overrides[get_redis] = _override_get_redis
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            yield c
+    finally:
+        app.dependency_overrides.clear()
+        async with _TestSession() as cleanup_db:
+            for model in _CLEANUP_ORDER:
+                await cleanup_db.execute(sa.delete(model))
+            await cleanup_db.commit()

@@ -10,6 +10,7 @@ from crewlayer.api.deps import DbDep, RedisDep, TenantDep
 from crewlayer.api.schemas.sessions import SessionCloseResponse, SessionCreate, SessionResponse
 from crewlayer.core.memory.short import ShortMemory
 from crewlayer.core.sessions.manager import SessionManager, SessionNotActiveError, SessionNotFoundError
+from crewlayer.core.streaming.broker import make_channel, publish as stream_publish
 from crewlayer.core.webhooks.dispatcher import dispatch
 from crewlayer.db.models import Agent, Memory, SessionStatus
 
@@ -120,6 +121,19 @@ async def close_session(
     # so we report message_count as a proxy (0 if redis was empty)
     memories_extracted = message_count
 
+    channel = make_channel(str(tenant.id), str(sess.agent_id), str(session_id))
+    asyncio.create_task(
+        stream_publish(redis, channel, "memory_extracted", {
+            "count": memories_extracted,
+            "session_id": str(session_id),
+        })
+    )
+    asyncio.create_task(
+        stream_publish(redis, channel, "session_closed", {
+            "session_id": str(session_id),
+            "status": "closed",
+        })
+    )
     asyncio.create_task(
         dispatch(
             tenant.id,
@@ -146,6 +160,7 @@ async def archive_session(
     session_id: uuid.UUID,
     tenant: TenantDep,
     db: DbDep,
+    redis: RedisDep,
 ) -> SessionResponse:
     """Archive a closed session."""
     mgr = SessionManager(db)
@@ -157,4 +172,12 @@ async def archive_session(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
     await db.commit()
     await db.refresh(sess)
+    asyncio.create_task(
+        stream_publish(
+            redis,
+            make_channel(str(tenant.id), str(sess.agent_id), str(session_id)),
+            "session_archived",
+            {"session_id": str(session_id), "status": "archived"},
+        )
+    )
     return SessionResponse.from_orm(sess)

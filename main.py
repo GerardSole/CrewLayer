@@ -7,7 +7,7 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from crewlayer.api.middleware.ratelimit import check_rate_limit
-from crewlayer.api.routes import actions, agents, auth, context, memory, sessions, usage, webhooks
+from crewlayer.api.routes import actions, agents, auth, context, memory, sessions, streaming, usage, webhooks
 from crewlayer.core.context.blackboard import cleanup_expired
 from crewlayer.db.session import AsyncSessionLocal
 
@@ -55,6 +55,7 @@ app.include_router(actions.router, prefix="/v1", tags=["actions"])
 app.include_router(context.router, prefix="/v1/context", tags=["context"])
 app.include_router(webhooks.router, prefix="/v1", tags=["webhooks"])
 app.include_router(sessions.router, prefix="/v1", tags=["sessions"])
+app.include_router(streaming.router, prefix="/v1", tags=["streaming"])
 app.include_router(usage.router, prefix="/v1", tags=["usage"])
 
 
