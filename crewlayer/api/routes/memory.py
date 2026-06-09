@@ -148,6 +148,7 @@ async def recall(
                 content=mem.content,
                 summary=mem.summary,
                 importance=mem.importance,
+                base_importance=mem.base_importance,
                 tags=mem.tags,
                 created_at=mem.created_at,
                 similarity=sim,
@@ -221,6 +222,7 @@ async def list_memories(
                 content=m.content,
                 summary=m.summary,
                 importance=m.importance,
+                base_importance=m.base_importance,
                 tags=m.tags,
                 created_at=m.created_at,
             )

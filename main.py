@@ -9,9 +9,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from crewlayer.api.middleware.ratelimit import check_rate_limit
 from crewlayer.api.routes import actions, agents, auth, context, memory, sessions, streaming, usage, webhooks
 from crewlayer.core.context.blackboard import cleanup_expired
+from crewlayer.core.memory.decay import decay_importance
 from crewlayer.db.session import AsyncSessionLocal
 
-_CLEANUP_INTERVAL = 60  # seconds
+_CLEANUP_INTERVAL = 60       # seconds
+_DECAY_INTERVAL = 86_400     # 24 hours in seconds
 
 
 async def _cleanup_loop() -> None:
@@ -23,13 +25,27 @@ async def _cleanup_loop() -> None:
                 await cleanup_expired(db)
 
 
+async def _decay_loop() -> None:
+    """Background task: decay importance of stale memories every 24 hours."""
+    while True:
+        await asyncio.sleep(_DECAY_INTERVAL)
+        with contextlib.suppress(Exception):
+            async with AsyncSessionLocal() as db:
+                await decay_importance(db)
+                await db.commit()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    task = asyncio.create_task(_cleanup_loop())
+    cleanup_task = asyncio.create_task(_cleanup_loop())
+    decay_task = asyncio.create_task(_decay_loop())
     yield
-    task.cancel()
+    cleanup_task.cancel()
+    decay_task.cancel()
     with contextlib.suppress(asyncio.CancelledError):
-        await task
+        await cleanup_task
+    with contextlib.suppress(asyncio.CancelledError):
+        await decay_task
 
 
 app = FastAPI(

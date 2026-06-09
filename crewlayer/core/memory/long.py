@@ -1,3 +1,4 @@
+import math
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -39,6 +40,7 @@ class LongMemory:
             summary=summary,
             embedding=vector,
             importance=importance,
+            base_importance=importance,
             tags=tags or [],
         )
         self._db.add(memory)
@@ -86,6 +88,9 @@ class LongMemory:
         for mem, _ in results:
             mem.last_accessed = now
             mem.access_count = (mem.access_count or 0) + 1
+            mem.importance = mem.base_importance * (
+                1 + math.log(mem.access_count + 1) * 0.1
+            )
 
         return results
 

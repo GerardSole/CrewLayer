@@ -35,6 +35,7 @@ class MemoryResponse(BaseModel):
     content: str
     summary: str | None = None
     importance: float
+    base_importance: float
     tags: list[str]
     created_at: datetime
     similarity: float | None = None

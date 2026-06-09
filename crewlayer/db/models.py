@@ -121,6 +121,9 @@ class Memory(Base):
     importance: Mapped[float] = mapped_column(
         Float, nullable=False, server_default="0.5"
     )
+    base_importance: Mapped[float] = mapped_column(
+        Float, nullable=False, server_default="0.5"
+    )
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), nullable=False, server_default=func.now()
     )
