@@ -4,7 +4,7 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from crewlayer.api.routes import agents, memory, actions, context
+from crewlayer.api.routes import agents, memory, actions, context, auth
 
 
 @asynccontextmanager
@@ -27,6 +27,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router, prefix="/v1", tags=["auth"])
 app.include_router(agents.router, prefix="/v1/agents", tags=["agents"])
 app.include_router(memory.router, prefix="/v1/memory", tags=["memory"])
 app.include_router(actions.router, prefix="/v1/actions", tags=["actions"])
