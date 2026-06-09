@@ -11,6 +11,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
@@ -145,6 +146,9 @@ class Action(Base):
 
 class ContextEntry(Base):
     __tablename__ = "context_entries"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "namespace", "key", name="uq_context_tenant_ns_key"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4

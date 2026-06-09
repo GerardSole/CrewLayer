@@ -1,3 +1,5 @@
+import asyncio
+import contextlib
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
@@ -5,11 +7,28 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from crewlayer.api.routes import agents, memory, actions, context, auth
+from crewlayer.core.context.blackboard import cleanup_expired
+from crewlayer.db.session import AsyncSessionLocal
+
+_CLEANUP_INTERVAL = 60  # seconds
+
+
+async def _cleanup_loop() -> None:
+    """Background task: purge expired context entries every minute."""
+    while True:
+        await asyncio.sleep(_CLEANUP_INTERVAL)
+        with contextlib.suppress(Exception):
+            async with AsyncSessionLocal() as db:
+                await cleanup_expired(db)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    task = asyncio.create_task(_cleanup_loop())
     yield
+    task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await task
 
 
 app = FastAPI(
