@@ -41,6 +41,20 @@ services:
       timeout: 5s
       retries: 5
 
+  mcp:
+    build: .
+    ports:
+      - "8001:8001"
+    env_file: .env
+    environment:
+      MCP_TRANSPORT: sse
+      CREWLAYER_BASE_URL: http://api:8000
+    depends_on:
+      - api
+    volumes:
+      - .:/app
+    command: python mcp/server.py
+
 volumes:
   pgdata:
   redisdata:
