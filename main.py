@@ -5,16 +5,33 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from crewlayer.api.middleware.audit import AuditLogMiddleware
 from crewlayer.api.middleware.ratelimit import check_rate_limit
-from crewlayer.api.routes import actions, agents, audit, auth, context, memory, sessions, streaming, usage, webhooks
+from crewlayer.api.routes import (
+    actions,
+    agents,
+    audit,
+    auth,
+    context,
+    memory,
+    sessions,
+    streaming,
+    usage,
+    webhooks,
+)
+from crewlayer.api.routes import (
+    metrics as metrics_route,
+)
 from crewlayer.core.context.blackboard import cleanup_expired
 from crewlayer.core.memory.decay import decay_importance
+from crewlayer.core.metrics.collectors import collect_metrics
 from crewlayer.db.session import AsyncSessionLocal
 
 _CLEANUP_INTERVAL = 60       # seconds
 _DECAY_INTERVAL = 86_400     # 24 hours in seconds
+_METRICS_INTERVAL = 60       # seconds
 
 
 async def _cleanup_loop() -> None:
@@ -36,17 +53,28 @@ async def _decay_loop() -> None:
                 await db.commit()
 
 
+async def _metrics_loop() -> None:
+    """Background task: refresh custom Prometheus gauges every 60 s."""
+    while True:
+        await collect_metrics()
+        await asyncio.sleep(_METRICS_INTERVAL)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     cleanup_task = asyncio.create_task(_cleanup_loop())
     decay_task = asyncio.create_task(_decay_loop())
+    metrics_task = asyncio.create_task(_metrics_loop())
     yield
     cleanup_task.cancel()
     decay_task.cancel()
+    metrics_task.cancel()
     with contextlib.suppress(asyncio.CancelledError):
         await cleanup_task
     with contextlib.suppress(asyncio.CancelledError):
         await decay_task
+    with contextlib.suppress(asyncio.CancelledError):
+        await metrics_task
 
 
 app = FastAPI(
@@ -56,6 +84,13 @@ app = FastAPI(
     lifespan=lifespan,
     dependencies=[Depends(check_rate_limit)],
 )
+
+# Instrument HTTP request metrics — exclude /metrics and /health from tracking
+Instrumentator(
+    excluded_handlers=["/metrics", "/health"],
+    should_ignore_untemplated=True,
+).instrument(app)
+# Note: .expose() is NOT called — /metrics is handled below with auth
 
 app.add_middleware(
     CORSMiddleware,
@@ -76,6 +111,7 @@ app.include_router(sessions.router, prefix="/v1", tags=["sessions"])
 app.include_router(streaming.router, prefix="/v1", tags=["streaming"])
 app.include_router(usage.router, prefix="/v1", tags=["usage"])
 app.include_router(audit.router, prefix="/v1", tags=["audit"])
+app.include_router(metrics_route.router, tags=["observability"])
 
 
 @app.get("/health", tags=["health"])

@@ -1,0 +1,14 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: crewlayer
+    static_configs:
+      - targets: ["api:8000"]
+    metrics_path: /metrics
+    # Use the standard Authorization header so no extra Prometheus plugin is needed.
+    # Set METRICS_TOKEN in .env and mirror it in docker-compose.observability.yml.
+    authorization:
+      type: Bearer
+      credentials: "${METRICS_TOKEN}"

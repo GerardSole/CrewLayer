@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     SHORT_MEMORY_TTL: int = 7200
     MAX_MEMORIES_PER_RECALL: int = 10
     LOG_LEVEL: str = "INFO"
+    METRICS_TOKEN: str = ""  # empty = only localhost can reach /metrics
 
 
 settings = Settings()

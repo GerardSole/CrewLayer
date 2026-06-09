@@ -1,0 +1,45 @@
+# Observability stack: Prometheus + Grafana
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d
+#
+# Set METRICS_TOKEN in your .env to secure /metrics.
+# The same token is injected into the Prometheus scrape config.
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheusdata:/prometheus
+    environment:
+      - METRICS_TOKEN=${METRICS_TOKEN:-}
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-lifecycle"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.0.0
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafanadata:/var/lib/grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-crewlayer}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+volumes:
+  prometheusdata:
+  grafanadata:
