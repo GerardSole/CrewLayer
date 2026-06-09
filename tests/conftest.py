@@ -1,3 +1,4 @@
+import contextlib
 from collections.abc import AsyncGenerator
 
 import pytest_asyncio
@@ -10,6 +11,7 @@ from sqlalchemy.pool import NullPool
 from crewlayer.api.middleware import audit as _audit_middleware
 from crewlayer.core.config import settings
 from crewlayer.core.redis import get_redis
+from crewlayer.core.streaming.context_broker import ContextBroker
 from crewlayer.db.models import (
     Action,
     Agent,
@@ -76,6 +78,47 @@ async def client(db: AsyncSession, redis_client: aioredis.Redis) -> AsyncGenerat
         for model in _CLEANUP_ORDER:
             await db.execute(sa.delete(model))
         await db.commit()
+        _audit_middleware.AsyncSessionLocal = _orig_session_local
+
+
+@pytest_asyncio.fixture
+async def context_streaming_client(redis_client: aioredis.Redis) -> AsyncGenerator[AsyncClient, None]:
+    """ASGI test client for context subscribe (SSE) tests.
+
+    Uses a *dedicated* Redis connection for the broker (mirroring main.py) so
+    that the broker's long-lived pubsub connection doesn't share the same pool
+    as the test assertion client.  Each request gets its own DB session to
+    allow concurrent SSE + REST calls without asyncpg conflicts.
+    """
+    # Separate client for the broker — avoids pool contention with redis_client
+    broker_redis = aioredis.from_url(settings.REDIS_URL, db=1, decode_responses=True)
+    broker = ContextBroker(broker_redis)
+    app.state.context_broker = broker
+
+    async def _override_get_db() -> AsyncGenerator[AsyncSession, None]:
+        async with _TestSession() as session:
+            yield session
+
+    async def _override_get_redis() -> AsyncGenerator[aioredis.Redis, None]:
+        yield redis_client
+
+    _orig_session_local = _audit_middleware.AsyncSessionLocal
+    _audit_middleware.AsyncSessionLocal = _TestSession
+
+    app.dependency_overrides[get_db] = _override_get_db
+    app.dependency_overrides[get_redis] = _override_get_redis
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            yield c
+    finally:
+        app.dependency_overrides.clear()
+        await broker.aclose()
+        with contextlib.suppress(Exception):
+            await broker_redis.aclose()
+        async with _TestSession() as cleanup_db:
+            for model in _CLEANUP_ORDER:
+                await cleanup_db.execute(sa.delete(model))
+            await cleanup_db.commit()
         _audit_middleware.AsyncSessionLocal = _orig_session_local
 
 

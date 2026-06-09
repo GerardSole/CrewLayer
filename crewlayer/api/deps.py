@@ -1,7 +1,7 @@
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any
 
 from fastapi import Depends, Header, HTTPException, Request, status
 from redis.asyncio import Redis
@@ -12,6 +12,9 @@ from crewlayer.core.redis import get_redis
 from crewlayer.core.security import verify_key
 from crewlayer.db.models import ApiKey, Tenant
 from crewlayer.db.session import get_db
+
+if TYPE_CHECKING:
+    from crewlayer.core.streaming.context_broker import ContextBroker
 
 
 @dataclass
@@ -145,9 +148,14 @@ def check_scope(required_scope: str) -> Any:
     return Depends(_dep)
 
 
+async def _get_context_broker(request: Request) -> "ContextBroker":
+    return request.app.state.context_broker  # type: ignore[no-any-return]
+
+
 # Annotated shortcuts for use in route signatures:
 #   async def route(tenant: TenantDep, db: DbDep, redis: RedisDep): ...
 TenantDep = Annotated[Tenant, Depends(get_current_tenant)]
 ApiKeyDep = Annotated[ApiKey, Depends(get_current_api_key)]
 DbDep = Annotated[AsyncSession, Depends(get_db)]
 RedisDep = Annotated[Redis, Depends(get_redis)]
+ContextBrokerDep = Annotated["ContextBroker", Depends(_get_context_broker)]

@@ -1,7 +1,11 @@
+import asyncio
+import json
 import uuid
+from contextlib import suppress
 from datetime import UTC, datetime
 from typing import Any
 
+from redis.asyncio import Redis
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,16 +21,44 @@ class VersionConflictError(Exception):
         super().__init__(f"Version conflict: expected {expected}, got {actual}")
 
 
+async def _publish_context_event(
+    redis: Redis,
+    tenant_id: uuid.UUID,
+    namespace: str,
+    key: str,
+    *,
+    value: dict[str, Any] | None,
+    version: int,
+    written_by: uuid.UUID | None,
+    event: str,
+) -> None:
+    """Publish a context change to the Redis channel for this key."""
+    channel = f"context:{tenant_id}:{namespace}:{key}"
+    payload = json.dumps({
+        "key": key,
+        "value": value,
+        "version": version,
+        "written_by": str(written_by) if written_by else None,
+        "event": event,
+    })
+    with suppress(Exception):
+        await redis.publish(channel, payload)
+
+
 class Blackboard:
     """Shared key-value store for multi-agent communication within a tenant.
 
     Namespace isolation: keys are scoped to (tenant_id, namespace, key).
     Optimistic locking: callers may pass expected_version; a mismatch raises
     VersionConflictError. Version is always incremented on each successful write.
+
+    When a Redis client is supplied, write() and delete() publish change events
+    to channel ``context:{tenant_id}:{namespace}:{key}`` as fire-and-forget tasks.
     """
 
-    def __init__(self, db: AsyncSession) -> None:
+    def __init__(self, db: AsyncSession, redis: Redis | None = None) -> None:
         self._db = db
+        self._redis = redis
 
     async def write(
         self,
@@ -55,7 +87,6 @@ class Blackboard:
         entry = result.scalar_one_or_none()
 
         if entry is None:
-            # New entry — version starts at 1
             if expected_version is not None and expected_version != 0:
                 raise VersionConflictError(expected=expected_version, actual=0)
             entry = ContextEntry(
@@ -69,7 +100,6 @@ class Blackboard:
             )
             self._db.add(entry)
         else:
-            # Existing entry — check optimistic lock
             if expected_version is not None and entry.version != expected_version:
                 raise VersionConflictError(expected=expected_version, actual=entry.version)
             entry.value = value
@@ -78,6 +108,21 @@ class Blackboard:
             entry.version += 1
 
         await self._db.flush()
+
+        if self._redis is not None:
+            asyncio.create_task(
+                _publish_context_event(
+                    self._redis,
+                    tenant_id,
+                    namespace,
+                    key,
+                    value=dict(entry.value),
+                    version=entry.version,
+                    written_by=written_by,
+                    event="updated",
+                )
+            )
+
         return entry
 
     async def read(
@@ -116,7 +161,6 @@ class Blackboard:
             select(ContextEntry).where(
                 ContextEntry.tenant_id == tenant_id,
                 ContextEntry.namespace == namespace,
-                # Include entries with no expiry OR whose expiry is in the future
                 (ContextEntry.expires_at.is_(None))
                 | (ContextEntry.expires_at > now),
             ).order_by(ContextEntry.key)
@@ -137,7 +181,23 @@ class Blackboard:
                 ContextEntry.key == key,
             )
         )
-        return result.rowcount > 0  # type: ignore[attr-defined, no-any-return]
+        deleted: bool = result.rowcount > 0  # type: ignore[attr-defined]
+
+        if deleted and self._redis is not None:
+            asyncio.create_task(
+                _publish_context_event(
+                    self._redis,
+                    tenant_id,
+                    namespace,
+                    key,
+                    value=None,
+                    version=0,
+                    written_by=None,
+                    event="deleted",
+                )
+            )
+
+        return deleted
 
 
 async def cleanup_expired(db: AsyncSession) -> int:

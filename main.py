@@ -3,6 +3,7 @@ import contextlib
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
+import redis.asyncio as aioredis
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
@@ -16,17 +17,17 @@ from crewlayer.api.routes import (
     auth,
     context,
     memory,
+    metrics as metrics_route,
     sessions,
     streaming,
     usage,
     webhooks,
 )
-from crewlayer.api.routes import (
-    metrics as metrics_route,
-)
+from crewlayer.core.config import settings
 from crewlayer.core.context.blackboard import cleanup_expired
 from crewlayer.core.memory.decay import decay_importance
 from crewlayer.core.metrics.collectors import collect_metrics
+from crewlayer.core.streaming.context_broker import ContextBroker
 from crewlayer.db.session import AsyncSessionLocal
 
 _CLEANUP_INTERVAL = 60       # seconds
@@ -62,10 +63,16 @@ async def _metrics_loop() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    # Dedicated Redis connection for the context pub/sub broker
+    broker_redis = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+    app.state.context_broker = ContextBroker(broker_redis)
+
     cleanup_task = asyncio.create_task(_cleanup_loop())
     decay_task = asyncio.create_task(_decay_loop())
     metrics_task = asyncio.create_task(_metrics_loop())
+
     yield
+
     cleanup_task.cancel()
     decay_task.cancel()
     metrics_task.cancel()
@@ -75,6 +82,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         await decay_task
     with contextlib.suppress(asyncio.CancelledError):
         await metrics_task
+
+    await app.state.context_broker.aclose()
+    with contextlib.suppress(Exception):
+        await broker_redis.aclose()
 
 
 app = FastAPI(
