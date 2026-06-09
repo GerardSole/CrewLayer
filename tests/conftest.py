@@ -9,7 +9,16 @@ from sqlalchemy.pool import NullPool
 
 from crewlayer.core.config import settings
 from crewlayer.core.redis import get_redis
-from crewlayer.db.models import Action, Agent, ApiKey, ContextEntry, Memory, Tenant
+from crewlayer.db.models import (
+    Action,
+    Agent,
+    ApiKey,
+    ContextEntry,
+    Memory,
+    Tenant,
+    WebhookDelivery,
+    WebhookEndpoint,
+)
 from crewlayer.db.session import get_db
 from main import app
 
@@ -19,7 +28,7 @@ _engine = create_async_engine(settings.DATABASE_URL, poolclass=NullPool)
 _TestSession = async_sessionmaker(_engine, expire_on_commit=False)
 
 # Deletion order respects FK constraints (children before parents)
-_CLEANUP_ORDER = [ApiKey, Action, ContextEntry, Memory, Agent, Tenant]
+_CLEANUP_ORDER = [ApiKey, Action, ContextEntry, Memory, WebhookDelivery, WebhookEndpoint, Agent, Tenant]
 
 
 @pytest_asyncio.fixture

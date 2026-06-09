@@ -1,6 +1,9 @@
+import asyncio
+
 from fastapi import APIRouter, HTTPException, status
 
 from crewlayer.api.deps import DbDep, TenantDep
+from crewlayer.core.webhooks.dispatcher import dispatch
 from crewlayer.api.schemas.context import (
     ContextEntryResponse,
     ContextNamespaceResponse,
@@ -42,6 +45,13 @@ async def write_entry(
         )
     await db.commit()
     await db.refresh(entry)
+    asyncio.create_task(
+        dispatch(
+            tenant.id,
+            "context.updated",
+            {"namespace": namespace, "key": key, "version": entry.version},
+        )
+    )
     return ContextEntryResponse.model_validate(entry)
 
 

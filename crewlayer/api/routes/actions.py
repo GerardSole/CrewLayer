@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from datetime import datetime
 from typing import Annotated
@@ -15,6 +16,7 @@ from crewlayer.api.schemas.actions import (
     ToolStatResponse,
 )
 from crewlayer.core.actions.logger import ActionFilters, ActionLogger
+from crewlayer.core.webhooks.dispatcher import dispatch
 from crewlayer.db.models import ActionStatus, Agent
 
 router = APIRouter()
@@ -58,6 +60,16 @@ async def log_action(
     )
     await db.commit()
     await db.refresh(action)
+    _webhook_payload = {
+        "action_id": str(action.id),
+        "agent_id": str(agent_id),
+        "tool_name": action.tool_name,
+        "status": action.status.value,
+        "duration_ms": action.duration_ms,
+    }
+    asyncio.create_task(dispatch(tenant.id, "action.logged", _webhook_payload))
+    if action.status in (ActionStatus.error, ActionStatus.timeout):
+        asyncio.create_task(dispatch(tenant.id, "action.failed", _webhook_payload))
     return ActionResponse.model_validate(action)
 
 

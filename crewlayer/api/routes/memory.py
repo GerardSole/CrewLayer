@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from typing import Annotated
 
@@ -6,6 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from crewlayer.api.deps import DbDep, RedisDep, TenantDep
+from crewlayer.core.webhooks.dispatcher import dispatch
 from crewlayer.api.schemas.memory import (
     ExtractRequest,
     ExtractResponse,
@@ -138,6 +140,13 @@ async def extract(
     lm = LongMemory(db, redis)
     memory_ids = await extract_and_save(tenant.id, agent_id, body.conversation, lm)
     await db.commit()
+    asyncio.create_task(
+        dispatch(
+            tenant.id,
+            "memory.extracted",
+            {"agent_id": str(agent_id), "memory_ids": [str(i) for i in memory_ids]},
+        )
+    )
     return ExtractResponse(extracted_count=len(memory_ids), memory_ids=memory_ids)
 
 
