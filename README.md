@@ -21,11 +21,19 @@ API docs: http://localhost:8000/docs
 |---|---|
 | **Short memory** | Per-session conversation history in Redis (capped list, TTL) |
 | **Long memory** | Semantic recall over PostgreSQL + pgvector (cosine similarity) |
-| **Memory extraction** | Claude claude-opus-4-8 extracts facts from conversations automatically |
-| **Action log** | Immutable, append-only record of every tool call with cursor pagination |
-| **Shared blackboard** | Namespace-scoped key/value store for multi-agent coordination, with optimistic locking |
+| **Memory deduplication** | Near-duplicates (cosine ≥ 0.90) are auto-merged by Claude; full lineage via `GET .../history` |
+| **Automatic forgetting** | Three-rule decay system: hard-delete stale low-importance, archive cold memories, decay unaccessed ones |
+| **Memory extraction** | `claude-opus-4-8` extracts facts from conversations and persists them as memories |
+| **Action log** | Immutable, append-only record of every tool call with cursor pagination and aggregate stats |
+| **Shared blackboard** | Namespace-scoped key/value store with optimistic locking and real-time SSE subscriptions |
+| **Agent status** | idle/working/error lifecycle, Redis-cached, auto-transitions on session open/close |
+| **Sessions** | Tracks agent conversations with start/end timestamps and status |
+| **Webhooks** | Register HTTP endpoints to receive event notifications (memory.extracted, etc.) |
+| **Audit log** | Immutable record of every mutating API call, cursor-paginated |
+| **Granular API keys** | Per-key scope restrictions (`memory:read`, `actions:write`, …) and agent-level restrictions |
+| **MCP server** | Native integration with Claude Desktop and Claude Code via 9 MCP tools |
+| **Prometheus metrics** | Auto HTTP metrics + 6 custom Gauges; Grafana dashboard included |
 | **Multi-tenant** | Every resource is scoped to a tenant; isolation enforced at query level |
-| **API key auth** | Keys encoded with their own ID for O(1) lookup; bcrypt-hashed |
 
 ---
 
@@ -146,20 +154,26 @@ client.actions.log(
 | Method | Path | Description |
 |---|---|---|
 | `POST` | `/v1/agents` | Create agent |
-| `GET` | `/v1/agents` | List agents |
+| `GET` | `/v1/agents` | List agents (filter by `?status=`) |
 | `GET` | `/v1/agents/{id}` | Get agent |
 | `DELETE` | `/v1/agents/{id}` | Delete agent |
+| `GET` | `/v1/agents/{id}/status` | Get status (Redis-cached) |
+| `PATCH` | `/v1/agents/{id}/status` | Set status (idle/working/error) |
 
 ### Memory
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/v1/agents/{id}/memory` | Save a memory |
-| `POST` | `/v1/agents/{id}/memory/recall` | Semantic recall |
-| `POST` | `/v1/agents/{id}/memory/extract` | Extract facts from conversation |
-| `GET` | `/v1/agents/{id}/memory` | List memories (paginated) |
+| `POST` | `/v1/agents/{id}/memory` | Save a memory (auto-deduplicates) |
+| `POST` | `/v1/agents/{id}/memory/recall` | Semantic recall (active memories only) |
+| `POST` | `/v1/agents/{id}/memory/extract` | Extract facts from conversation with Claude |
+| `GET` | `/v1/agents/{id}/memory` | List memories (`?include_archived=true` for archived) |
 | `DELETE` | `/v1/agents/{id}/memory/{memory_id}` | Soft-delete a memory |
-| `GET/POST` | `/v1/agents/{id}/memory/short/{session_id}` | Short-term session history |
+| `GET` | `/v1/agents/{id}/memory/messages` | Short-term session history |
+| `POST` | `/v1/agents/{id}/memory/messages` | Append to session history |
+| `GET` | `/v1/agents/{id}/memories/{memory_id}/history` | Merge lineage (BFS ancestors) |
+| `GET` | `/v1/agents/{id}/memories/stats` | Aggregate stats (active, archived, avg importance) |
+| `POST` | `/v1/agents/{id}/memories/archive` | Force-archive memories below threshold |
 
 ### Actions
 
@@ -168,7 +182,16 @@ client.actions.log(
 | `POST` | `/v1/agents/{id}/actions` | Log an action |
 | `GET` | `/v1/agents/{id}/actions` | List actions (cursor paginated) |
 | `GET` | `/v1/agents/{id}/actions/{action_id}` | Get one action |
-| `GET` | `/v1/agents/{id}/actions/stats` | Aggregate stats |
+| `GET` | `/v1/agents/{id}/actions/stats` | Aggregate stats (total, error rate, avg duration) |
+
+### Sessions
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/v1/agents/{id}/sessions` | Start a session |
+| `GET` | `/v1/agents/{id}/sessions` | List sessions |
+| `GET` | `/v1/agents/{id}/sessions/{session_id}` | Get session |
+| `POST` | `/v1/agents/{id}/sessions/{session_id}/end` | End a session |
 
 ### Context (Blackboard)
 
@@ -178,6 +201,29 @@ client.actions.log(
 | `GET` | `/v1/context/{namespace}/{key}` | Read |
 | `GET` | `/v1/context/{namespace}` | List namespace |
 | `DELETE` | `/v1/context/{namespace}/{key}` | Delete |
+| `GET` | `/v1/context/{namespace}/{key}/subscribe` | SSE stream — real-time updates |
+
+### Webhooks
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/v1/webhooks` | Register webhook |
+| `GET` | `/v1/webhooks` | List webhooks |
+| `DELETE` | `/v1/webhooks/{id}` | Delete webhook |
+
+### Audit Log
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/v1/audit-log` | Cursor-paginated immutable audit log |
+
+### Observability
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/health` | Health check |
+| `GET` | `/metrics` | Prometheus metrics (auth required from non-localhost) |
+| `GET` | `/v1/usage` | Resource usage stats for the current tenant |
 
 ---
 
@@ -189,7 +235,64 @@ DATABASE_URL=postgresql+asyncpg://user:pass@localhost/crewlayer
 REDIS_URL=redis://localhost:6379
 SECRET_KEY=<random 32+ bytes>
 EMBEDDING_PROVIDER=anthropic   # or "local"
+
+# Optional
+METRICS_TOKEN=<token>          # protects /metrics from non-localhost IPs
+MCP_PORT=8001                  # MCP server SSE port
+MCP_TRANSPORT=stdio            # "stdio" or "sse"
+CREWLAYER_API_KEY=crwl_...     # API key used by the MCP server
 ```
+
+---
+
+## Conectar con Claude
+
+CrewLayer incluye un servidor MCP que expone sus funciones como herramientas nativas para Claude.
+
+### Claude Code (CLI)
+
+```bash
+claude mcp add crewlayer -- python -m mcp.server
+```
+
+O manualmente en la configuración MCP:
+
+```json
+{
+  "mcpServers": {
+    "crewlayer": {
+      "command": "python",
+      "args": ["-m", "mcp.server"],
+      "cwd": "/ruta/a/CrewLayer",
+      "env": {
+        "CREWLAYER_API_KEY": "crwl_...",
+        "CREWLAYER_BASE_URL": "http://localhost:8000"
+      }
+    }
+  }
+}
+```
+
+### Claude Desktop
+
+Añadir el mismo bloque `mcpServers` a `~/Library/Application Support/Claude/claude_desktop_config.json` (Mac) o `%APPDATA%\Claude\claude_desktop_config.json` (Windows).
+
+Una vez configurado, Claude puede usar directamente `memory_recall`, `action_log`, `context_write` y el resto de las 9 herramientas sin código adicional.
+
+---
+
+## Observabilidad
+
+```bash
+docker compose -f docker-compose.observability.yml up -d
+```
+
+- **Prometheus**: http://localhost:9090
+- **Grafana**: http://localhost:3000 (admin/admin)
+
+Importar el dashboard: Grafana → Dashboards → Import → subir `observability/grafana/dashboards/crewlayer.json`.
+
+El dashboard incluye: latencia HTTP (p50/p95/p99), memories activas vs archivadas, agents por estado, sessions activas, action log entries, tasa de errores.
 
 ---
 
@@ -200,7 +303,7 @@ pip install -e ".[dev]"
 pytest tests/ -v
 ```
 
-All 52 tests run against a real PostgreSQL and Redis instance (no mocks for infrastructure).
+240 tests run against a real PostgreSQL and Redis instance (no mocks for infrastructure).
 
 ---
 

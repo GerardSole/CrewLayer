@@ -50,6 +50,8 @@ pytest tests/ -v
 
 Tests require a running PostgreSQL and Redis (use `docker compose up -d`). Each test creates its own tenant and cleans up after itself. Redis uses DB 1 (production uses DB 0).
 
+The pub/sub and SSE-related tests (`test_context_subscribe.py`) subscribe directly to Redis channels to avoid httpx ASGI transport cleanup issues. They also require Redis to be running. The context broker in tests uses a **dedicated Redis client on DB 1** to avoid pubsub pool contention with the shared test client.
+
 ```bash
 # Run a single test file
 pytest tests/test_memory.py -v
@@ -90,23 +92,31 @@ crewlayer/
 ├── api/
 │   ├── routes/          # HTTP handlers (thin — no business logic here)
 │   ├── schemas/         # Pydantic request/response models
-│   └── deps.py          # Shared FastAPI dependencies (auth, db, redis)
+│   ├── middleware/      # ASGI middleware (audit log, rate limiting)
+│   └── deps.py          # Shared FastAPI dependencies (auth, db, redis, check_scope)
 ├── core/
-│   ├── memory/          # Short memory (Redis), long memory (pgvector), extractor
+│   ├── memory/          # Short (Redis), long (pgvector), extractor, merger, decay
 │   ├── actions/         # Action logger
 │   ├── context/         # Shared blackboard
 │   ├── embeddings/      # Embedding generation with Redis cache
+│   ├── metrics/         # Custom Prometheus gauges (collectors.py)
+│   ├── streaming/       # Pub/sub broker (broker.py, context_broker.py)
+│   ├── webhooks/        # Async webhook dispatcher
 │   ├── config.py        # pydantic-settings config
 │   ├── redis.py         # Redis connection pool
 │   └── security.py      # bcrypt helpers
 ├── db/
-│   ├── models.py        # SQLAlchemy ORM models
+│   ├── models.py        # SQLAlchemy ORM models (all enums + tables)
 │   ├── session.py       # Async session factory
-│   └── migrations/      # Alembic versions
+│   └── alembic/versions/  # Alembic migrations (head: b8c9d0e1f2a3)
+mcp/                     # MCP server (FastMCP, 9 tools)
 sdk/                     # Installable Python SDK
+observability/           # Grafana dashboard JSON
 scripts/                 # Utility scripts (seed, etc.)
-tests/                   # pytest test suite
-main.py                  # FastAPI app + lifespan
+tests/                   # pytest test suite (240 tests)
+docker-compose.yml                  # Main stack (Postgres + Redis)
+docker-compose.observability.yml    # Prometheus + Grafana
+main.py                  # FastAPI app + lifespan (background tasks)
 ```
 
 ## Adding a new endpoint
@@ -133,3 +143,75 @@ All public endpoints live under `/v1/`. Breaking changes require a new version p
 | `MAX_MEMORIES_PER_RECALL` | No | Default: 20 |
 | `SHORT_MEMORY_TTL` | No | Redis TTL in seconds. Default: 3600 |
 | `CONTEXT_CLEANUP_INTERVAL` | No | Background cleanup interval. Default: 60 |
+| `METRICS_TOKEN` | No | Bearer token for `/metrics` from non-localhost IPs |
+| `MCP_PORT` | No | MCP server SSE port. Default: 8001 |
+| `MCP_TRANSPORT` | No | `stdio` (default) or `sse` |
+| `CREWLAYER_API_KEY` | No | API key used by the MCP server to call the REST API |
+
+## Observabilidad
+
+```bash
+# Levantar Prometheus + Grafana
+docker compose -f docker-compose.observability.yml up -d
+```
+
+Prometheus scrapes `http://host.docker.internal:8000/metrics` every 15 s. Grafana runs on http://localhost:3000 (admin/admin).
+
+**Importar el dashboard:**
+1. Grafana → Dashboards → Import
+2. Subir `observability/grafana/dashboards/crewlayer.json`
+3. Seleccionar el datasource Prometheus
+
+El dashboard muestra: total agents por status, memories activas/archivadas, action log entries, sesiones activas, latencia HTTP p50/p95/p99 por ruta.
+
+## MCP Server
+
+El servidor MCP expone las funciones de CrewLayer como herramientas para Claude.
+
+### Probar con Claude Code (CLI)
+
+Añadir al fichero de configuración MCP de Claude Code (`~/.claude/mcp_settings.json` o equivalente):
+
+```json
+{
+  "mcpServers": {
+    "crewlayer": {
+      "command": "python",
+      "args": ["-m", "mcp.server"],
+      "cwd": "/ruta/a/CrewLayer",
+      "env": {
+        "CREWLAYER_API_KEY": "crwl_...",
+        "CREWLAYER_BASE_URL": "http://localhost:8000"
+      }
+    }
+  }
+}
+```
+
+### Probar con Claude Desktop
+
+Añadir en `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "crewlayer": {
+      "command": "python",
+      "args": ["-m", "mcp.server"],
+      "cwd": "/ruta/a/CrewLayer",
+      "env": {
+        "CREWLAYER_API_KEY": "crwl_...",
+        "CREWLAYER_BASE_URL": "http://localhost:8000"
+      }
+    }
+  }
+}
+```
+
+### Modo SSE (Docker)
+
+```bash
+MCP_TRANSPORT=sse MCP_PORT=8001 python -m mcp.server
+```
+
+O usando el servicio `mcp` en `docker-compose.yml`.
