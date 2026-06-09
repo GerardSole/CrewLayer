@@ -3,10 +3,11 @@ import contextlib
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from crewlayer.api.routes import actions, agents, auth, context, memory, sessions, webhooks
+from crewlayer.api.middleware.ratelimit import check_rate_limit
+from crewlayer.api.routes import actions, agents, auth, context, memory, sessions, usage, webhooks
 from crewlayer.core.context.blackboard import cleanup_expired
 from crewlayer.db.session import AsyncSessionLocal
 
@@ -36,6 +37,7 @@ app = FastAPI(
     description="Open source backend for AI agents with persistent memory and multi-agent support",
     version="0.1.0",
     lifespan=lifespan,
+    dependencies=[Depends(check_rate_limit)],
 )
 
 app.add_middleware(
@@ -53,6 +55,7 @@ app.include_router(actions.router, prefix="/v1", tags=["actions"])
 app.include_router(context.router, prefix="/v1/context", tags=["context"])
 app.include_router(webhooks.router, prefix="/v1", tags=["webhooks"])
 app.include_router(sessions.router, prefix="/v1", tags=["sessions"])
+app.include_router(usage.router, prefix="/v1", tags=["usage"])
 
 
 @app.get("/health", tags=["health"])
