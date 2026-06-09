@@ -1,5 +1,6 @@
 import pytest
 import pytest_asyncio
+import redis.asyncio as aioredis
 import sqlalchemy as sa
 from collections.abc import AsyncGenerator
 from httpx import ASGITransport, AsyncClient
@@ -7,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sess
 from sqlalchemy.pool import NullPool
 
 from crewlayer.core.config import settings
+from crewlayer.core.redis import get_redis
 from crewlayer.db.models import Action, Agent, ApiKey, ContextEntry, Memory, Tenant
 from crewlayer.db.session import get_db
 from main import app
@@ -27,15 +29,28 @@ async def db() -> AsyncGenerator[AsyncSession, None]:
 
 
 @pytest_asyncio.fixture
-async def client(db: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
-    """ASGI test client whose DB calls share the test's session.
+async def redis_client() -> AsyncGenerator[aioredis.Redis, None]:
+    """Isolated Redis client on DB 1 (DB 0 is production)."""
+    client = aioredis.from_url(settings.REDIS_URL, db=1, decode_responses=True)
+    yield client
+    await client.flushdb()
+    await client.aclose()
+
+
+@pytest_asyncio.fixture
+async def client(db: AsyncSession, redis_client: aioredis.Redis) -> AsyncGenerator[AsyncClient, None]:
+    """ASGI test client whose DB and Redis calls share the test's sessions.
 
     After each test all rows are deleted so tests are fully isolated.
     """
     async def _override_get_db() -> AsyncGenerator[AsyncSession, None]:
         yield db
 
+    async def _override_get_redis() -> AsyncGenerator[aioredis.Redis, None]:
+        yield redis_client
+
     app.dependency_overrides[get_db] = _override_get_db
+    app.dependency_overrides[get_redis] = _override_get_redis
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
             yield c

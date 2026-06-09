@@ -3,9 +3,11 @@ from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import Depends, Header, HTTPException, status
+from redis.asyncio import Redis
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from crewlayer.core.redis import get_redis
 from crewlayer.core.security import verify_key
 from crewlayer.db.models import ApiKey, Tenant
 from crewlayer.db.session import get_db
@@ -78,6 +80,7 @@ async def get_current_tenant(
 
 
 # Annotated shortcuts for use in route signatures:
-#   async def route(tenant: TenantDep, db: DbDep): ...
+#   async def route(tenant: TenantDep, db: DbDep, redis: RedisDep): ...
 TenantDep = Annotated[Tenant, Depends(get_current_tenant)]
 DbDep = Annotated[AsyncSession, Depends(get_db)]
+RedisDep = Annotated[Redis, Depends(get_redis)]

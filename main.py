@@ -29,7 +29,7 @@ app.add_middleware(
 
 app.include_router(auth.router, prefix="/v1", tags=["auth"])
 app.include_router(agents.router, prefix="/v1/agents", tags=["agents"])
-app.include_router(memory.router, prefix="/v1/memory", tags=["memory"])
+app.include_router(memory.router, prefix="/v1", tags=["memory"])
 app.include_router(actions.router, prefix="/v1/actions", tags=["actions"])
 app.include_router(context.router, prefix="/v1/context", tags=["context"])
 
