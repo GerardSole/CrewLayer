@@ -1,12 +1,12 @@
 import asyncio
 import contextlib
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from crewlayer.api.routes import agents, memory, actions, context, auth
+from crewlayer.api.routes import actions, agents, auth, context, memory
 from crewlayer.core.context.blackboard import cleanup_expired
 from crewlayer.db.session import AsyncSessionLocal
 

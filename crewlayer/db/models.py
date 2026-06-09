@@ -6,6 +6,8 @@ from typing import Any
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     Enum as SAEnum,
+)
+from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,

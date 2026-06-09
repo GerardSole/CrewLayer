@@ -1,10 +1,10 @@
-import pytest
+from collections.abc import AsyncGenerator
+
 import pytest_asyncio
 import redis.asyncio as aioredis
 import sqlalchemy as sa
-from collections.abc import AsyncGenerator
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
 from crewlayer.core.config import settings

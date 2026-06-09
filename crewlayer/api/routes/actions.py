@@ -4,6 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from crewlayer.api.deps import DbDep, TenantDep
 from crewlayer.api.schemas.actions import (
@@ -19,7 +20,7 @@ from crewlayer.db.models import ActionStatus, Agent
 router = APIRouter()
 
 
-async def _get_agent(agent_id: uuid.UUID, tenant_id: uuid.UUID, db) -> Agent:
+async def _get_agent(agent_id: uuid.UUID, tenant_id: uuid.UUID, db: AsyncSession) -> Agent:
     result = await db.execute(
         select(Agent).where(Agent.id == agent_id, Agent.tenant_id == tenant_id)
     )

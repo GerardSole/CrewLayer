@@ -149,7 +149,7 @@ async def test_list_returns_newest_first(client: AsyncClient) -> None:
     _, agent, headers = await _setup(client)
 
     first = await _log(client, agent["id"], headers, tool_name="first")
-    second = await _log(client, agent["id"], headers, tool_name="second")
+    await _log(client, agent["id"], headers, tool_name="second")
     third = await _log(client, agent["id"], headers, tool_name="third")
 
     r = await client.get(f"/v1/agents/{agent['id']}/actions", headers=headers)

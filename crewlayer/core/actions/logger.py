@@ -9,7 +9,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from crewlayer.db.models import Action, ActionStatus
 
-
 # ---------------------------------------------------------------------------
 # Cursor helpers — keyset pagination on (timestamp DESC, id DESC)
 # ---------------------------------------------------------------------------
@@ -120,7 +119,7 @@ class ActionLogger:
         Sorted by (timestamp DESC, id DESC). next_cursor is None when
         the page is the last one.
         """
-        conditions: list = [
+        conditions: list[Any] = [
             Action.tenant_id == tenant_id,
             Action.agent_id == agent_id,
         ]
@@ -191,7 +190,7 @@ class ActionLogger:
             await self._db.execute(
                 select(
                     Action.tool_name,
-                    func.count().label("count"),
+                    func.count().label("action_count"),
                     func.avg(Action.duration_ms).label("avg_duration"),
                     func.sum(
                         case((Action.status == ActionStatus.error, 1), else_=0)
@@ -206,9 +205,9 @@ class ActionLogger:
         by_tool = [
             ToolStat(
                 tool_name=r.tool_name,
-                count=r.count,
+                count=r.action_count,
                 avg_duration_ms=float(r.avg_duration) if r.avg_duration is not None else None,
-                error_rate=int(r.errors or 0) / r.count if r.count > 0 else 0.0,
+                error_rate=int(r.errors or 0) / r.action_count if r.action_count > 0 else 0.0,
             )
             for r in tool_rows
         ]

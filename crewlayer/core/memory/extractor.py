@@ -1,7 +1,9 @@
 import json
 import uuid
+from typing import Any, cast
 
 import anthropic
+from anthropic.types import TextBlock
 
 from crewlayer.core.memory.long import LongMemory
 
@@ -38,7 +40,7 @@ async def extract_and_save(
         system=_SYSTEM,
         messages=[{"role": "user", "content": conversation}],
     )
-    raw = response.content[0].text.strip()
+    raw = cast(TextBlock, response.content[0]).text.strip()
 
     # Strip markdown code fences when the model ignores the system prompt
     if raw.startswith("```"):
@@ -46,7 +48,7 @@ async def extract_and_save(
         raw = raw.rsplit("```", 1)[0].strip()
 
     try:
-        facts: list[dict] = json.loads(raw)
+        facts: list[dict[str, Any]] = json.loads(raw)
     except json.JSONDecodeError:
         return []
 

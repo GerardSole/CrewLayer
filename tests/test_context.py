@@ -1,6 +1,6 @@
 """Blackboard / context tests: write, read, version conflict, expiry, namespace list, tenant isolation."""
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from httpx import AsyncClient
@@ -175,7 +175,7 @@ async def test_list_empty_namespace_returns_zero(client: AsyncClient) -> None:
 async def test_expired_entry_not_readable(client: AsyncClient) -> None:
     _, headers = await _setup(client)
 
-    past = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()
+    past = (datetime.now(UTC) - timedelta(seconds=1)).isoformat()
     r = await _put(client, headers, "exp", "stale", {"x": 1}, expires_at=past)
     assert r.status_code == 200
 
@@ -186,8 +186,8 @@ async def test_expired_entry_not_readable(client: AsyncClient) -> None:
 async def test_expired_entry_excluded_from_list(client: AsyncClient) -> None:
     _, headers = await _setup(client)
 
-    future = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
-    past = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()
+    future = (datetime.now(UTC) + timedelta(hours=1)).isoformat()
+    past = (datetime.now(UTC) - timedelta(seconds=1)).isoformat()
 
     await _put(client, headers, "mixed", "live", {"ok": True}, expires_at=future)
     await _put(client, headers, "mixed", "dead", {"ok": False}, expires_at=past)

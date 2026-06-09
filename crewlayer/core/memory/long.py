@@ -1,5 +1,6 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,7 +16,7 @@ class LongMemory:
     Provides semantic recall via cosine similarity and soft-delete via deleted_at.
     """
 
-    def __init__(self, db: AsyncSession, redis=None) -> None:
+    def __init__(self, db: AsyncSession, redis: Any = None) -> None:
         self._db = db
         self._redis = redis
 
@@ -81,7 +82,7 @@ class LongMemory:
 
         results = [(mem, float(sim)) for mem, sim in rows if float(sim) >= min_similarity]
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         for mem, _ in results:
             mem.last_accessed = now
             mem.access_count = (mem.access_count or 0) + 1
@@ -100,5 +101,5 @@ class LongMemory:
         memory = result.scalar_one_or_none()
         if memory is None:
             return False
-        memory.deleted_at = datetime.now(timezone.utc)
+        memory.deleted_at = datetime.now(UTC)
         return True

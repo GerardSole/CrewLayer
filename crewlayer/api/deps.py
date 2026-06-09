@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import Depends, Header, HTTPException, status
@@ -63,12 +63,12 @@ async def get_current_tenant(
     if api_key.expires_at is not None:
         expires_at = api_key.expires_at
         if expires_at.tzinfo is None:
-            expires_at = expires_at.replace(tzinfo=timezone.utc)
-        if expires_at < datetime.now(timezone.utc):
+            expires_at = expires_at.replace(tzinfo=UTC)
+        if expires_at < datetime.now(UTC):
             raise _UNAUTHORIZED
 
     # Track last usage — committed here so read-only routes update it too
-    api_key.last_used_at = datetime.now(timezone.utc)
+    api_key.last_used_at = datetime.now(UTC)
     await db.commit()
 
     result = await db.execute(select(Tenant).where(Tenant.id == api_key.tenant_id))
@@ -76,7 +76,7 @@ async def get_current_tenant(
     if tenant is None:
         raise _UNAUTHORIZED
 
-    return tenant
+    return tenant  # type: ignore[return-value]
 
 
 # Annotated shortcuts for use in route signatures:

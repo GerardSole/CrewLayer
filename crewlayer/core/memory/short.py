@@ -1,5 +1,5 @@
 import json
-from typing import Any
+from typing import Any, cast
 
 from redis.asyncio import Redis
 
@@ -46,7 +46,7 @@ class ShortMemory:
     ) -> list[dict[str, Any]]:
         """Return up to `limit` most recent messages (newest first)."""
         key = self._key(tenant_id, agent_id, session_id)
-        raw: list[str] = await self._r.lrange(key, 0, limit - 1)
+        raw = cast(list[str], await self._r.lrange(key, 0, limit - 1))
         return [json.loads(r) for r in raw]
 
     async def clear(self, tenant_id: str, agent_id: str, session_id: str) -> None:

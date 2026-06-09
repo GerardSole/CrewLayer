@@ -1,5 +1,6 @@
 import hashlib
 import json
+from typing import Any
 
 import httpx
 
@@ -9,7 +10,7 @@ EMBEDDING_DIM = 1536
 _CACHE_TTL = 86400  # 24 hours
 
 
-async def get_embedding(text: str, redis=None) -> list[float]:
+async def get_embedding(text: str, redis: Any = None) -> list[float]:
     """Return a 1536-dimensional embedding vector for the given text.
 
     Results are cached in Redis under key emb:{sha256[:16]} for 24 hours.
@@ -64,7 +65,7 @@ async def _embed_local(text: str) -> list[float]:
 
     global _local_model
     if _local_model is None:
-        from sentence_transformers import SentenceTransformer  # type: ignore[import-untyped]
+        from sentence_transformers import SentenceTransformer
         _local_model = SentenceTransformer("all-MiniLM-L6-v2")
 
     model = _local_model

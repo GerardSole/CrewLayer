@@ -6,7 +6,6 @@ from typing import Any
 from crewlayer._http import AsyncTransport, SyncTransport
 from crewlayer._types import (
     ExtractResult,
-    MemoryItem,
     MemoryPage,
     RecallResult,
     ShortMemory,

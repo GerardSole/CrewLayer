@@ -1,9 +1,8 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import delete, select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from crewlayer.db.models import ContextEntry
@@ -101,8 +100,8 @@ class Blackboard:
         if entry.expires_at is not None:
             exp = entry.expires_at
             if exp.tzinfo is None:
-                exp = exp.replace(tzinfo=timezone.utc)
-            if exp < datetime.now(timezone.utc):
+                exp = exp.replace(tzinfo=UTC)
+            if exp < datetime.now(UTC):
                 return None
         return entry
 
@@ -112,7 +111,7 @@ class Blackboard:
         namespace: str,
     ) -> list[ContextEntry]:
         """Return all non-expired entries in a namespace, ordered by key."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         result = await self._db.execute(
             select(ContextEntry).where(
                 ContextEntry.tenant_id == tenant_id,
@@ -138,7 +137,7 @@ class Blackboard:
                 ContextEntry.key == key,
             )
         )
-        return result.rowcount > 0
+        return result.rowcount > 0  # type: ignore[attr-defined, no-any-return]
 
 
 async def cleanup_expired(db: AsyncSession) -> int:
@@ -146,8 +145,8 @@ async def cleanup_expired(db: AsyncSession) -> int:
     result = await db.execute(
         delete(ContextEntry).where(
             ContextEntry.expires_at.isnot(None),
-            ContextEntry.expires_at < datetime.now(timezone.utc),
+            ContextEntry.expires_at < datetime.now(UTC),
         )
     )
     await db.commit()
-    return result.rowcount
+    return result.rowcount  # type: ignore[attr-defined, no-any-return]

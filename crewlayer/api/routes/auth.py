@@ -1,5 +1,6 @@
 import secrets
 import uuid
+from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
@@ -32,7 +33,7 @@ def _make_api_key_record(
     name: str,
     scopes: list[str],
     raw_key: str,
-    expires_at=None,
+    expires_at: datetime | None = None,
 ) -> tuple[ApiKey, str]:
     """Return (ApiKey ORM object, raw_key) without adding to any session."""
     return ApiKey(

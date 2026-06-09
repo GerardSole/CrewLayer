@@ -43,9 +43,11 @@ dev = [
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+exclude = ["alembic/", "sdk/"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
+ignore = ["E501", "UP042"]
 
 [tool.mypy]
 python_version = "3.12"

@@ -12,8 +12,8 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-from crewlayer.db.models import Base
 from crewlayer.core.config import settings
+from crewlayer.db.models import Base
 
 target_metadata = Base.metadata
 
