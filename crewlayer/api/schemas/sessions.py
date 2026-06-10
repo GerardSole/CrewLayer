@@ -12,10 +12,15 @@ class SessionCreate(BaseModel):
     metadata: dict[str, Any] = {}
 
 
+class SessionUpdate(BaseModel):
+    episode_id: uuid.UUID | None = None
+
+
 class SessionResponse(BaseModel):
     id: uuid.UUID
     tenant_id: uuid.UUID
     agent_id: uuid.UUID
+    episode_id: uuid.UUID | None = None
     status: SessionStatus
     summary: str | None
     message_count: int
@@ -31,6 +36,7 @@ class SessionResponse(BaseModel):
             id=obj.id,
             tenant_id=obj.tenant_id,
             agent_id=obj.agent_id,
+            episode_id=obj.episode_id,
             status=obj.status,
             summary=obj.summary,
             message_count=obj.message_count,

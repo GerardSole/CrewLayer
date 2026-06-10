@@ -82,6 +82,12 @@ class ContextOperationEnum(str, enum.Enum):
     rollback = "rollback"
 
 
+class EpisodeStatusEnum(str, enum.Enum):
+    active = "active"
+    completed = "completed"
+    archived = "archived"
+
+
 class Tenant(Base):
     __tablename__ = "tenants"
 
@@ -290,6 +296,11 @@ class Session(Base):
     agent_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("agents.id", ondelete="CASCADE"), nullable=False, index=True
     )
+    episode_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("episodes.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     status: Mapped[SessionStatus] = mapped_column(
         SAEnum(SessionStatus, name="session_status"),
         nullable=False,
@@ -366,3 +377,55 @@ class WebhookDelivery(Base):
     attempts: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     last_attempt_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
     response_status: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+class Episode(Base):
+    __tablename__ = "episodes"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    agent_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("agents.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[EpisodeStatusEnum] = mapped_column(
+        SAEnum(EpisodeStatusEnum, name="episode_status_enum"),
+        nullable=False,
+        server_default=EpisodeStatusEnum.active.value,
+    )
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    started_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False, server_default=func.now()
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+    metadata_: Mapped[dict[str, Any]] = mapped_column(
+        "metadata", JSONB, nullable=False, server_default="{}"
+    )
+
+
+class EpisodeMemory(Base):
+    __tablename__ = "episode_memories"
+    __table_args__ = (
+        UniqueConstraint("episode_id", "memory_id", name="uq_episode_memory"),
+    )
+
+    episode_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("episodes.id", ondelete="CASCADE"),
+        primary_key=True,
+        nullable=False,
+    )
+    memory_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("memories.id", ondelete="CASCADE"),
+        primary_key=True,
+        nullable=False,
+    )
+    added_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False, server_default=func.now()
+    )

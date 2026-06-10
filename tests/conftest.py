@@ -19,6 +19,8 @@ from crewlayer.db.models import (
     AuditLog,
     ContextEntry,
     ContextHistory,
+    Episode,
+    EpisodeMemory,
     Memory,
     Session,
     Tenant,
@@ -34,7 +36,7 @@ _engine = create_async_engine(settings.DATABASE_URL, poolclass=NullPool)
 _TestSession = async_sessionmaker(_engine, expire_on_commit=False)
 
 # Deletion order respects FK constraints (children before parents)
-_CLEANUP_ORDER = [AuditLog, ApiKey, Action, ContextHistory, ContextEntry, Memory, WebhookDelivery, WebhookEndpoint, Session, Agent, Tenant]
+_CLEANUP_ORDER = [AuditLog, ApiKey, Action, ContextHistory, ContextEntry, EpisodeMemory, Memory, WebhookDelivery, WebhookEndpoint, Session, Episode, Agent, Tenant]
 
 
 @pytest_asyncio.fixture

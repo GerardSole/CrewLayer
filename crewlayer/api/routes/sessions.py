@@ -7,8 +7,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from crewlayer.api.deps import DbDep, RedisDep, TenantDep, check_scope
-from crewlayer.api.schemas.sessions import SessionCloseResponse, SessionCreate, SessionResponse
+from crewlayer.api.schemas.sessions import SessionCloseResponse, SessionCreate, SessionResponse, SessionUpdate
 from crewlayer.core.agents.status import cache_status
+from crewlayer.core.memory.episodic import EpisodeNotFoundError, EpisodicMemory, SessionNotFoundError as EpisodicSessionNotFoundError
 from crewlayer.core.memory.short import ShortMemory
 from crewlayer.core.sessions.manager import SessionManager, SessionNotActiveError, SessionNotFoundError
 from crewlayer.core.streaming.broker import make_channel, publish as stream_publish
@@ -85,6 +86,44 @@ async def get_session(
         sess = await mgr.get(session_id, tenant.id)
     except SessionNotFoundError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sesión no encontrada")
+    return SessionResponse.from_orm(sess)
+
+
+@router.patch(
+    "/sessions/{session_id}",
+    response_model=SessionResponse,
+    dependencies=[check_scope("sessions:write")],
+    summary="Update a session — assign or clear episode_id",
+)
+async def update_session(
+    session_id: uuid.UUID,
+    body: SessionUpdate,
+    tenant: TenantDep,
+    db: DbDep,
+) -> SessionResponse:
+    """Assign (or clear) the episode a session belongs to.
+
+    When episode_id is set, the session's memories are automatically linked to that episode.
+    """
+    mgr = SessionManager(db)
+    try:
+        sess = await mgr.get(session_id, tenant.id)
+    except SessionNotFoundError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sesión no encontrada")
+
+    if body.episode_id is not None:
+        em = EpisodicMemory(db)
+        try:
+            await em.add_session_to_episode(tenant.id, body.episode_id, session_id)
+        except EpisodeNotFoundError:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Episodio no encontrado")
+        except EpisodicSessionNotFoundError:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sesión no encontrada")
+    else:
+        sess.episode_id = None
+
+    await db.commit()
+    await db.refresh(sess)
     return SessionResponse.from_orm(sess)
 
 

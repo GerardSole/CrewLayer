@@ -17,6 +17,7 @@ from crewlayer.api.routes import (
     audit,
     auth,
     context,
+    episodes,
     memory,
     metrics as metrics_route,
     sessions,
@@ -141,6 +142,7 @@ app.include_router(auth.router, prefix="/v1", tags=["auth"])
 app.include_router(agents.router, prefix="/v1/agents", tags=["agents"])
 app.include_router(memory.router, prefix="/v1", tags=["memory"])
 app.include_router(actions.router, prefix="/v1", tags=["actions"])
+app.include_router(episodes.router, prefix="/v1", tags=["episodes"])
 app.include_router(context.router, prefix="/v1/context", tags=["context"])
 app.include_router(webhooks.router, prefix="/v1", tags=["webhooks"])
 app.include_router(sessions.router, prefix="/v1", tags=["sessions"])
