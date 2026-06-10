@@ -1,13 +1,17 @@
+import asyncio
 import uuid
 from datetime import datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import String, cast, func, select, text
 from sqlalchemy.dialects.postgresql import ARRAY
 
 from crewlayer.api.deps import DbDep, RedisDep, TenantDep, check_scope
+from crewlayer.core.agents import portability as _portability
+from crewlayer.core.agents.portability import AgentExportData
 from crewlayer.core.agents.relations import (
     AgentNotFoundError,
     AgentRelations,
@@ -75,6 +79,12 @@ class TagsAddBody(BaseModel):
     tags: list[str]
 
 
+class ImportResponse(BaseModel):
+    agent: "AgentResponse"
+    id_map: dict[str, dict[str, str]]
+    warnings: list[str] = []
+
+
 class RelationCreate(BaseModel):
     other_agent_id: uuid.UUID
     relation_type: AgentRelationTypeEnum
@@ -137,6 +147,79 @@ async def list_tags(tenant: TenantDep, db: DbDep) -> list[TagCount]:
     )
     rows = (await db.execute(stmt)).all()
     return [TagCount(tag=str(r.tag), count=int(r.count)) for r in rows]
+
+
+# ---------------------------------------------------------------------------
+# Export / Import  (registered before /{agent_id} routes)
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/{agent_id}/export",
+    dependencies=[check_scope("agents:read")],
+    summary="Export a full agent backup as a downloadable JSON file",
+)
+async def export_agent(
+    agent_id: uuid.UUID,
+    tenant: TenantDep,
+    db: DbDep,
+) -> StreamingResponse:
+    """Stream all agent data (metadata, memories, actions, episodes, sessions,
+    relations) as a JSON attachment. The 90-day action window and all non-deleted
+    memories are included. Embeddings are embedded in the file for portability."""
+    await _get_agent_or_404(agent_id, tenant.id, db)
+    filename = f"agent_{agent_id}.json"
+    return StreamingResponse(
+        _portability.stream_export_agent(db, tenant.id, agent_id),
+        media_type="application/json",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@router.post(
+    "/import",
+    status_code=status.HTTP_201_CREATED,
+    response_model=ImportResponse,
+    dependencies=[check_scope("agents:write")],
+    summary="Import an agent from a previously exported JSON backup",
+)
+async def import_agent(
+    body: AgentExportData,
+    tenant: TenantDep,
+    db: DbDep,
+) -> ImportResponse:
+    """Restore an exported agent as a brand-new agent under the authenticated tenant.
+
+    ``export_version`` must be "1.0". The operation is fully transactional (savepoint):
+    if anything fails, no partial data is left behind. Embeddings are regenerated in
+    background after the response is sent so the call returns immediately.
+    """
+    try:
+        async with db.begin_nested():
+            new_agent, id_map, new_memory_ids = await _portability.import_agent(
+                db, tenant.id, body
+            )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"Import failed: {exc}",
+        )
+    await db.commit()
+    await db.refresh(new_agent)
+
+    asyncio.create_task(_portability.regenerate_embeddings_background(new_memory_ids))
+
+    warnings: list[str] = []
+    if body.relations:
+        warnings.append(
+            f"{len(body.relations)} relation(s) from the export were not restored "
+            "because referenced agents may not exist in this environment."
+        )
+
+    return ImportResponse(
+        agent=AgentResponse.model_validate(new_agent),
+        id_map=id_map,
+        warnings=warnings,
+    )
 
 
 # ---------------------------------------------------------------------------
