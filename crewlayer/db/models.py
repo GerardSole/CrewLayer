@@ -88,6 +88,12 @@ class EpisodeStatusEnum(str, enum.Enum):
     archived = "archived"
 
 
+class AgentRelationTypeEnum(str, enum.Enum):
+    supervisor = "supervisor"
+    collaborator = "collaborator"
+    delegate = "delegate"
+
+
 class Tenant(Base):
     __tablename__ = "tenants"
 
@@ -405,6 +411,34 @@ class Episode(Base):
     completed_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
     metadata_: Mapped[dict[str, Any]] = mapped_column(
         "metadata", JSONB, nullable=False, server_default="{}"
+    )
+
+
+class AgentRelation(Base):
+    __tablename__ = "agent_relations"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "supervisor_id", "subordinate_id", name="uq_agent_relation"),
+        Index("ix_agent_relations_supervisor", "tenant_id", "supervisor_id"),
+        Index("ix_agent_relations_subordinate", "tenant_id", "subordinate_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
+    )
+    supervisor_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("agents.id", ondelete="CASCADE"), nullable=False
+    )
+    subordinate_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("agents.id", ondelete="CASCADE"), nullable=False
+    )
+    relation_type: Mapped[AgentRelationTypeEnum] = mapped_column(
+        SAEnum(AgentRelationTypeEnum, name="agent_relation_type_enum"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False, server_default=func.now()
     )
 
 

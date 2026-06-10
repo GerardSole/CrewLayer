@@ -8,12 +8,20 @@ from sqlalchemy import String, cast, func, select, text
 from sqlalchemy.dialects.postgresql import ARRAY
 
 from crewlayer.api.deps import DbDep, RedisDep, TenantDep, check_scope
+from crewlayer.core.agents.relations import (
+    AgentNotFoundError,
+    AgentRelations,
+    CycleError,
+    DuplicateSupervisorError,
+    RelationNotFoundError,
+    SelfRelationError,
+)
 from crewlayer.core.agents.status import (
     apply_status,
     cache_status,
     read_cached_status,
 )
-from crewlayer.db.models import Agent, AgentStatusEnum
+from crewlayer.db.models import Agent, AgentRelationTypeEnum, AgentStatusEnum
 
 router = APIRouter()
 
@@ -65,6 +73,21 @@ class TagCount(BaseModel):
 
 class TagsAddBody(BaseModel):
     tags: list[str]
+
+
+class RelationCreate(BaseModel):
+    other_agent_id: uuid.UUID
+    relation_type: AgentRelationTypeEnum
+
+
+class RelationResponse(BaseModel):
+    id: uuid.UUID
+    supervisor_id: uuid.UUID
+    subordinate_id: uuid.UUID
+    relation_type: AgentRelationTypeEnum
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
 
 
 class AlertsConfig(BaseModel):
@@ -340,6 +363,125 @@ async def update_agent_status(
         updated_at=agent.status_updated_at,
     )
 
+
+# ---------------------------------------------------------------------------
+# Relation endpoints
+# ---------------------------------------------------------------------------
+
+@router.post(
+    "/{agent_id}/relations",
+    status_code=status.HTTP_201_CREATED,
+    response_model=RelationResponse,
+    dependencies=[check_scope("agents:write")],
+    summary="Define a relation between this agent and another",
+)
+async def set_relation(
+    agent_id: uuid.UUID,
+    body: RelationCreate,
+    tenant: TenantDep,
+    db: DbDep,
+) -> RelationResponse:
+    """Create or update a relation.
+
+    ``agent_id`` is always the supervisor/from side. For ``supervisor`` type,
+    ``agent_id`` supervises ``other_agent_id``. An agent can only have one supervisor
+    but multiple collaborators or delegates.
+    """
+    ar = AgentRelations(db)
+    try:
+        rel = await ar.set_relation(
+            tenant.id, agent_id, body.other_agent_id, body.relation_type
+        )
+    except SelfRelationError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Un agente no puede relacionarse consigo mismo",
+        )
+    except CycleError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="La relación crearía un ciclo en la jerarquía",
+        )
+    except DuplicateSupervisorError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="El agente ya tiene un supervisor asignado",
+        )
+    except AgentNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Agente no encontrado",
+        )
+    await db.commit()
+    await db.refresh(rel)
+    return RelationResponse.model_validate(rel)
+
+
+@router.get(
+    "/{agent_id}/relations",
+    response_model=list[RelationResponse],
+    dependencies=[check_scope("agents:read")],
+    summary="List all relations of this agent",
+)
+async def list_relations(
+    agent_id: uuid.UUID,
+    tenant: TenantDep,
+    db: DbDep,
+) -> list[RelationResponse]:
+    """Return every relation where this agent appears as supervisor or subordinate."""
+    await _get_agent_or_404(agent_id, tenant.id, db)
+    ar = AgentRelations(db)
+    rels = await ar.get_all_relations(tenant.id, agent_id)
+    return [RelationResponse.model_validate(r) for r in rels]
+
+
+@router.get(
+    "/{agent_id}/tree",
+    dependencies=[check_scope("agents:read")],
+    summary="Return the full downward hierarchy tree",
+)
+async def get_tree(
+    agent_id: uuid.UUID,
+    tenant: TenantDep,
+    db: DbDep,
+) -> dict:
+    """Return the hierarchical tree of supervisor→subordinate relations rooted at agent_id."""
+    ar = AgentRelations(db)
+    try:
+        return await ar.get_tree(tenant.id, agent_id)
+    except AgentNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Agente no encontrado",
+        )
+
+
+@router.delete(
+    "/{agent_id}/relations/{other_agent_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[check_scope("agents:write")],
+    summary="Delete the relation between two agents",
+)
+async def delete_relation(
+    agent_id: uuid.UUID,
+    other_agent_id: uuid.UUID,
+    tenant: TenantDep,
+    db: DbDep,
+) -> None:
+    """Remove the relation between agent_id and other_agent_id in either direction."""
+    ar = AgentRelations(db)
+    deleted = await ar.delete_relation(tenant.id, agent_id, other_agent_id)
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Relación no encontrada",
+        )
+    await db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Status endpoints
+# ---------------------------------------------------------------------------
 
 @router.get(
     "/{agent_id}/status",

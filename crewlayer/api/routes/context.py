@@ -16,6 +16,7 @@ from fastapi import APIRouter, HTTPException, Query, Request, status
 from sse_starlette.sse import EventSourceResponse, ServerSentEvent  # type: ignore[attr-defined]
 
 from crewlayer.api.deps import ContextBrokerDep, DbDep, RedisDep, TenantDep, check_scope
+from crewlayer.core.agents.relations import AgentRelations
 from crewlayer.api.schemas.context import (
     ContextEntryResponse,
     ContextHistoryEntry,
@@ -319,6 +320,19 @@ async def write_entry(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Version conflict: expected {exc.expected}, current is {exc.actual}",
         )
+
+    if body.propagate and body.written_by is not None:
+        ar = AgentRelations(db)
+        sub_ids = await ar.get_direct_supervisor_subordinate_ids(tenant.id, body.written_by)
+        for sub_id in sub_ids:
+            await bb.write(
+                tenant_id=tenant.id,
+                namespace=str(sub_id),
+                key=key,
+                value=body.value,
+                written_by=body.written_by,
+            )
+
     await db.commit()
     await db.refresh(entry)
     asyncio.create_task(

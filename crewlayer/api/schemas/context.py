@@ -16,6 +16,13 @@ class ContextWrite(BaseModel):
             "Omit to skip the check. Use 0 to assert the key does not yet exist."
         ),
     )
+    propagate: bool = Field(
+        default=False,
+        description=(
+            "If True and written_by is a supervisor agent, propagate this write to all "
+            "direct supervisor-type subordinates (writing to namespace=str(subordinate_id))."
+        ),
+    )
 
 
 class ContextEntryResponse(BaseModel):
