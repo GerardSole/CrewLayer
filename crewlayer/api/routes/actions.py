@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from crewlayer.api.deps import DbDep, TenantDep, check_scope
+from crewlayer.api.deps import DbDep, RedisDep, TenantDep, check_scope
 from crewlayer.api.schemas.actions import (
     ActionCreate,
     ActionListResponse,
@@ -15,6 +15,7 @@ from crewlayer.api.schemas.actions import (
     ActionStatsResponse,
     ToolStatResponse,
 )
+from crewlayer.core.actions.alerts import check_and_fire_alerts
 from crewlayer.core.actions.logger import ActionFilters, ActionLogger
 from crewlayer.core.webhooks.dispatcher import dispatch
 from crewlayer.db.models import ActionStatus, Agent, Session, SessionStatus
@@ -62,9 +63,10 @@ async def log_action(
     body: ActionCreate,
     tenant: TenantDep,
     db: DbDep,
+    redis: RedisDep,
 ) -> ActionResponse:
     """Register an immutable action record for an agent."""
-    await _get_agent(agent_id, tenant.id, db)
+    agent = await _get_agent(agent_id, tenant.id, db)
     await _validate_session(body.session_id, agent_id, tenant.id, db)
     logger = ActionLogger(db)
     action = await logger.log(
@@ -91,6 +93,16 @@ async def log_action(
     asyncio.create_task(dispatch(tenant.id, "action.logged", _webhook_payload))
     if action.status in (ActionStatus.error, ActionStatus.timeout):
         asyncio.create_task(dispatch(tenant.id, "action.failed", _webhook_payload))
+    await check_and_fire_alerts(
+        tenant_id=tenant.id,
+        agent_id=agent_id,
+        agent_name=agent.name,
+        agent_config=agent.config,
+        action_status=action.status,
+        action_id=action.id,
+        db=db,
+        redis=redis,
+    )
     return ActionResponse.model_validate(action)
 
 

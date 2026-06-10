@@ -67,6 +67,18 @@ class TagsAddBody(BaseModel):
     tags: list[str]
 
 
+class AlertsConfig(BaseModel):
+    alerts_enabled: bool = True
+    alert_on_consecutive_errors: int = 5
+    alert_on_error_rate_percent: int = 80
+
+
+class AlertsConfigUpdate(BaseModel):
+    alerts_enabled: bool | None = None
+    alert_on_consecutive_errors: int | None = None
+    alert_on_error_rate_percent: int | None = None
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -240,6 +252,63 @@ async def remove_tag(
     await db.commit()
     await db.refresh(agent)
     return AgentResponse.model_validate(agent)
+
+
+# ---------------------------------------------------------------------------
+# Alert config endpoints
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/{agent_id}/alerts/config",
+    response_model=AlertsConfig,
+    dependencies=[check_scope("agents:read")],
+    summary="Get the alert configuration for an agent",
+)
+async def get_alerts_config(
+    agent_id: uuid.UUID,
+    tenant: TenantDep,
+    db: DbDep,
+) -> AlertsConfig:
+    """Return the alert thresholds stored in agent.config, with defaults filled in."""
+    agent = await _get_agent_or_404(agent_id, tenant.id, db)
+    cfg = agent.config
+    return AlertsConfig(
+        alerts_enabled=bool(cfg.get("alerts_enabled", True)),
+        alert_on_consecutive_errors=int(cfg.get("alert_on_consecutive_errors", 5)),
+        alert_on_error_rate_percent=int(cfg.get("alert_on_error_rate_percent", 80)),
+    )
+
+
+@router.patch(
+    "/{agent_id}/alerts/config",
+    response_model=AlertsConfig,
+    dependencies=[check_scope("agents:write")],
+    summary="Update the alert configuration for an agent",
+)
+async def update_alerts_config(
+    agent_id: uuid.UUID,
+    body: AlertsConfigUpdate,
+    tenant: TenantDep,
+    db: DbDep,
+) -> AlertsConfig:
+    """Partially update alert thresholds. Only provided fields are changed."""
+    agent = await _get_agent_or_404(agent_id, tenant.id, db)
+    config = dict(agent.config)
+    if body.alerts_enabled is not None:
+        config["alerts_enabled"] = body.alerts_enabled
+    if body.alert_on_consecutive_errors is not None:
+        config["alert_on_consecutive_errors"] = body.alert_on_consecutive_errors
+    if body.alert_on_error_rate_percent is not None:
+        config["alert_on_error_rate_percent"] = body.alert_on_error_rate_percent
+    agent.config = config
+    await db.commit()
+    await db.refresh(agent)
+    cfg = agent.config
+    return AlertsConfig(
+        alerts_enabled=bool(cfg.get("alerts_enabled", True)),
+        alert_on_consecutive_errors=int(cfg.get("alert_on_consecutive_errors", 5)),
+        alert_on_error_rate_percent=int(cfg.get("alert_on_error_rate_percent", 80)),
+    )
 
 
 # ---------------------------------------------------------------------------
