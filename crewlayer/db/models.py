@@ -147,6 +147,13 @@ class Agent(Base):
     current_session_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), nullable=True
     )
+    tags: Mapped[list[str]] = mapped_column(
+        ARRAY(String), nullable=False, server_default="{}"
+    )
+
+    __table_args__ = (
+        Index("ix_agents_tags", "tags", postgresql_using="gin"),
+    )
 
 
 class Memory(Base):
