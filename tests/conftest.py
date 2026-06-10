@@ -18,6 +18,7 @@ from crewlayer.db.models import (
     ApiKey,
     AuditLog,
     ContextEntry,
+    ContextHistory,
     Memory,
     Session,
     Tenant,
@@ -33,7 +34,7 @@ _engine = create_async_engine(settings.DATABASE_URL, poolclass=NullPool)
 _TestSession = async_sessionmaker(_engine, expire_on_commit=False)
 
 # Deletion order respects FK constraints (children before parents)
-_CLEANUP_ORDER = [AuditLog, ApiKey, Action, ContextEntry, Memory, WebhookDelivery, WebhookEndpoint, Session, Agent, Tenant]
+_CLEANUP_ORDER = [AuditLog, ApiKey, Action, ContextHistory, ContextEntry, Memory, WebhookDelivery, WebhookEndpoint, Session, Agent, Tenant]
 
 
 @pytest_asyncio.fixture
@@ -75,6 +76,11 @@ async def client(db: AsyncSession, redis_client: aioredis.Redis) -> AsyncGenerat
             yield c
     finally:
         app.dependency_overrides.clear()
+        # If the session is in PendingRollbackError state (from a flush exception
+        # during the test), roll back first so we can issue new SQL statements.
+        with contextlib.suppress(Exception):
+            await db.rollback()
+        db.expunge_all()
         for model in _CLEANUP_ORDER:
             await db.execute(sa.delete(model))
         await db.commit()

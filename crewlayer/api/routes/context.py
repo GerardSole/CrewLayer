@@ -5,26 +5,45 @@ generic /{namespace}/{key} route, otherwise Starlette would greedily match
 /ns/subscribe as key="subscribe".
 """
 import asyncio
+import base64
 import contextlib
 import json
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
 from sse_starlette.sse import EventSourceResponse, ServerSentEvent  # type: ignore[attr-defined]
 
 from crewlayer.api.deps import ContextBrokerDep, DbDep, RedisDep, TenantDep, check_scope
 from crewlayer.api.schemas.context import (
     ContextEntryResponse,
+    ContextHistoryEntry,
+    ContextHistoryResponse,
     ContextNamespaceResponse,
     ContextWrite,
+    RollbackRequest,
+    RollbackResponse,
 )
-from crewlayer.core.context.blackboard import Blackboard, VersionConflictError
+from crewlayer.core.context.blackboard import (
+    Blackboard,
+    RollbackToDeletionError,
+    VersionConflictError,
+    VersionNotFoundError,
+)
 from crewlayer.core.streaming.context_broker import (
     make_key_channel,
     make_namespace_pattern,
 )
 from crewlayer.core.webhooks.dispatcher import dispatch
+
+
+def _encode_cursor(version: int) -> str:
+    return base64.urlsafe_b64encode(str(version).encode()).decode()
+
+
+def _decode_cursor(cursor: str) -> int:
+    return int(base64.urlsafe_b64decode(cursor.encode()).decode())
 
 router = APIRouter()
 
@@ -138,6 +157,131 @@ async def subscribe_key(
     """
     channel = make_key_channel(tenant.id, namespace, key)
     return EventSourceResponse(_sse_generator(request, channel, broker, pattern=False))
+
+
+# ---------------------------------------------------------------------------
+# History endpoints — registered before /{namespace}/{key} (CRUD)
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/{namespace}/{key}/history",
+    response_model=ContextHistoryResponse,
+    dependencies=[check_scope("context:read")],
+    summary="List all changes to a context key (newest first, cursor-paginated)",
+)
+async def list_history(
+    namespace: str,
+    key: str,
+    tenant: TenantDep,
+    db: DbDep,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    cursor: Annotated[str | None, Query()] = None,
+) -> ContextHistoryResponse:
+    """Return the immutable change log for *namespace*/*key*, ordered by version descending.
+
+    Use the returned ``next_cursor`` as the ``cursor`` query parameter to fetch
+    the next page.  Returns an empty list when all changes have been returned.
+    """
+    before_version: int | None = None
+    if cursor is not None:
+        try:
+            before_version = _decode_cursor(cursor)
+        except Exception:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cursor inválido")
+
+    bb = Blackboard(db)
+    entries = await bb.get_history(
+        tenant.id, namespace, key,
+        before_version=before_version,
+        limit=limit + 1,
+    )
+
+    next_cursor: str | None = None
+    if len(entries) > limit:
+        next_cursor = _encode_cursor(entries[limit - 1].version)
+        entries = entries[:limit]
+
+    return ContextHistoryResponse(
+        namespace=namespace,
+        key=key,
+        entries=[ContextHistoryEntry.model_validate(e) for e in entries],
+        next_cursor=next_cursor,
+    )
+
+
+@router.get(
+    "/{namespace}/{key}/history/{version}",
+    response_model=ContextHistoryEntry,
+    dependencies=[check_scope("context:read")],
+    summary="Get the value a key had at a specific version",
+)
+async def history_at_version(
+    namespace: str,
+    key: str,
+    version: int,
+    tenant: TenantDep,
+    db: DbDep,
+) -> ContextHistoryEntry:
+    """Return the exact state of *namespace*/*key* at *version*.
+
+    Returns 404 if that version number does not exist.
+    The value is ``null`` when the operation at that version was a deletion.
+    """
+    bb = Blackboard(db)
+    hist = await bb.at_version(tenant.id, namespace, key, version)
+    if hist is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Versión no encontrada")
+    return ContextHistoryEntry.model_validate(hist)
+
+
+@router.post(
+    "/{namespace}/{key}/rollback",
+    response_model=RollbackResponse,
+    dependencies=[check_scope("context:write")],
+    summary="Restore a context key to an earlier version",
+)
+async def rollback_entry(
+    namespace: str,
+    key: str,
+    body: RollbackRequest,
+    tenant: TenantDep,
+    db: DbDep,
+    redis: RedisDep,
+) -> RollbackResponse:
+    """Restore *namespace*/*key* to the value it had at ``target_version``.
+
+    Creates a new history entry with ``operation=rollback``.
+    Returns 404 if the target version does not exist.
+    Returns 422 if the target version was a deletion (no value to restore).
+    """
+    bb = Blackboard(db, redis=redis)
+    try:
+        entry, hist = await bb.rollback(
+            tenant.id,
+            namespace,
+            key,
+            body.target_version,
+            written_by=body.written_by,
+        )
+    except VersionNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Versión {exc.version} no encontrada",
+        )
+    except RollbackToDeletionError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=f"No se puede restaurar la versión {exc.version}: el registro fue eliminado en esa versión",
+        )
+    await db.commit()
+    await db.refresh(entry)
+    return RollbackResponse(
+        namespace=namespace,
+        key=key,
+        restored_version=body.target_version,
+        new_version=hist.version,
+        entry=ContextEntryResponse.model_validate(entry),
+    )
 
 
 # ---------------------------------------------------------------------------

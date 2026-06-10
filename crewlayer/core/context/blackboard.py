@@ -6,10 +6,10 @@ from datetime import UTC, datetime
 from typing import Any
 
 from redis.asyncio import Redis
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from crewlayer.db.models import ContextEntry
+from crewlayer.db.models import ContextEntry, ContextHistory, ContextOperationEnum
 
 
 class VersionConflictError(Exception):
@@ -19,6 +19,22 @@ class VersionConflictError(Exception):
         self.expected = expected
         self.actual = actual
         super().__init__(f"Version conflict: expected {expected}, got {actual}")
+
+
+class VersionNotFoundError(Exception):
+    """Raised when a requested history version does not exist."""
+
+    def __init__(self, version: int) -> None:
+        self.version = version
+        super().__init__(f"History version {version} not found")
+
+
+class RollbackToDeletionError(Exception):
+    """Raised when attempting to rollback to a version whose operation was 'deleted'."""
+
+    def __init__(self, version: int) -> None:
+        self.version = version
+        super().__init__(f"Cannot rollback to version {version}: the key was deleted at that point")
 
 
 async def _publish_context_event(
@@ -52,8 +68,12 @@ class Blackboard:
     Optimistic locking: callers may pass expected_version; a mismatch raises
     VersionConflictError. Version is always incremented on each successful write.
 
-    When a Redis client is supplied, write() and delete() publish change events
-    to channel ``context:{tenant_id}:{namespace}:{key}`` as fire-and-forget tasks.
+    Every write and delete appends an immutable row to context_history within
+    the same transaction, providing a full audit trail.
+
+    When a Redis client is supplied, write(), delete(), and rollback() publish
+    change events to channel ``context:{tenant_id}:{namespace}:{key}`` as
+    fire-and-forget tasks.
     """
 
     def __init__(self, db: AsyncSession, redis: Redis | None = None) -> None:
@@ -75,6 +95,7 @@ class Blackboard:
 
         If expected_version is provided it must match the current version
         (or be 0 / None for a brand-new key). On mismatch raises VersionConflictError.
+        Inserts an immutable ContextHistory row in the same transaction.
         Caller must commit after this returns.
         """
         result = await self._db.execute(
@@ -89,6 +110,16 @@ class Blackboard:
         if entry is None:
             if expected_version is not None and expected_version != 0:
                 raise VersionConflictError(expected=expected_version, actual=0)
+            operation = ContextOperationEnum.created
+            # If this key existed before and was deleted, continue the version sequence.
+            max_v = (await self._db.execute(
+                select(func.max(ContextHistory.version)).where(
+                    ContextHistory.tenant_id == tenant_id,
+                    ContextHistory.namespace == namespace,
+                    ContextHistory.key == key,
+                )
+            )).scalar_one() or 0
+            new_version = max_v + 1
             entry = ContextEntry(
                 tenant_id=tenant_id,
                 namespace=namespace,
@@ -96,17 +127,29 @@ class Blackboard:
                 value=value,
                 written_by=written_by,
                 expires_at=expires_at,
-                version=1,
+                version=new_version,
             )
             self._db.add(entry)
         else:
             if expected_version is not None and entry.version != expected_version:
                 raise VersionConflictError(expected=expected_version, actual=entry.version)
+            operation = ContextOperationEnum.updated
             entry.value = value
             entry.written_by = written_by
             entry.expires_at = expires_at
             entry.version += 1
+            new_version = entry.version
 
+        hist = ContextHistory(
+            tenant_id=tenant_id,
+            namespace=namespace,
+            key=key,
+            value=dict(value),
+            version=new_version,
+            written_by=written_by,
+            operation=operation,
+        )
+        self._db.add(hist)
         await self._db.flush()
 
         if self._redis is not None:
@@ -173,17 +216,36 @@ class Blackboard:
         namespace: str,
         key: str,
     ) -> bool:
-        """Delete an entry. Returns False if it did not exist."""
+        """Delete an entry. Returns False if it did not exist.
+
+        Inserts a ContextHistory row with operation=deleted in the same transaction.
+        Caller must commit after this returns.
+        """
         result = await self._db.execute(
-            delete(ContextEntry).where(
+            select(ContextEntry).where(
                 ContextEntry.tenant_id == tenant_id,
                 ContextEntry.namespace == namespace,
                 ContextEntry.key == key,
             )
         )
-        deleted: bool = result.rowcount > 0  # type: ignore[attr-defined]
+        entry = result.scalar_one_or_none()
+        if entry is None:
+            return False
 
-        if deleted and self._redis is not None:
+        hist = ContextHistory(
+            tenant_id=tenant_id,
+            namespace=namespace,
+            key=key,
+            value=None,
+            version=entry.version + 1,
+            written_by=None,
+            operation=ContextOperationEnum.deleted,
+        )
+        self._db.add(hist)
+        await self._db.delete(entry)
+        await self._db.flush()
+
+        if self._redis is not None:
             asyncio.create_task(
                 _publish_context_event(
                     self._redis,
@@ -197,7 +259,148 @@ class Blackboard:
                 )
             )
 
-        return deleted
+        return True
+
+    async def get_history(
+        self,
+        tenant_id: uuid.UUID,
+        namespace: str,
+        key: str,
+        *,
+        before_version: int | None = None,
+        limit: int = 20,
+    ) -> list[ContextHistory]:
+        """Return history entries for a key ordered by version descending.
+
+        Pass before_version to paginate (cursor = version of the last item seen).
+        """
+        filters: list[Any] = [
+            ContextHistory.tenant_id == tenant_id,
+            ContextHistory.namespace == namespace,
+            ContextHistory.key == key,
+        ]
+        if before_version is not None:
+            filters.append(ContextHistory.version < before_version)
+
+        return list(
+            (await self._db.execute(
+                select(ContextHistory)
+                .where(*filters)
+                .order_by(ContextHistory.version.desc())
+                .limit(limit)
+            )).scalars().all()
+        )
+
+    async def at_version(
+        self,
+        tenant_id: uuid.UUID,
+        namespace: str,
+        key: str,
+        version: int,
+    ) -> ContextHistory | None:
+        """Return the history entry for the given version, or None if it doesn't exist."""
+        return (await self._db.execute(
+            select(ContextHistory).where(
+                ContextHistory.tenant_id == tenant_id,
+                ContextHistory.namespace == namespace,
+                ContextHistory.key == key,
+                ContextHistory.version == version,
+            )
+        )).scalar_one_or_none()
+
+    async def rollback(
+        self,
+        tenant_id: uuid.UUID,
+        namespace: str,
+        key: str,
+        target_version: int,
+        *,
+        written_by: uuid.UUID | None = None,
+    ) -> tuple[ContextEntry, ContextHistory]:
+        """Restore a key to the value it had at target_version.
+
+        Creates a new history entry with operation=rollback. Raises
+        VersionNotFoundError if the version doesn't exist, or
+        RollbackToDeletionError if that version was a deletion.
+        Caller must commit after this returns.
+        """
+        target = (await self._db.execute(
+            select(ContextHistory).where(
+                ContextHistory.tenant_id == tenant_id,
+                ContextHistory.namespace == namespace,
+                ContextHistory.key == key,
+                ContextHistory.version == target_version,
+            )
+        )).scalar_one_or_none()
+
+        if target is None:
+            raise VersionNotFoundError(target_version)
+        if target.operation == ContextOperationEnum.deleted:
+            raise RollbackToDeletionError(target_version)
+
+        # Next version = max existing version across history + 1
+        max_v = (await self._db.execute(
+            select(func.max(ContextHistory.version)).where(
+                ContextHistory.tenant_id == tenant_id,
+                ContextHistory.namespace == namespace,
+                ContextHistory.key == key,
+            )
+        )).scalar_one() or 0
+        new_version = max_v + 1
+
+        restored_value = dict(target.value)  # type: ignore[arg-type]
+
+        # Upsert context_entries
+        entry = (await self._db.execute(
+            select(ContextEntry).where(
+                ContextEntry.tenant_id == tenant_id,
+                ContextEntry.namespace == namespace,
+                ContextEntry.key == key,
+            )
+        )).scalar_one_or_none()
+
+        if entry is None:
+            entry = ContextEntry(
+                tenant_id=tenant_id,
+                namespace=namespace,
+                key=key,
+                value=restored_value,
+                written_by=written_by,
+                version=new_version,
+            )
+            self._db.add(entry)
+        else:
+            entry.value = restored_value
+            entry.written_by = written_by
+            entry.version = new_version
+
+        hist = ContextHistory(
+            tenant_id=tenant_id,
+            namespace=namespace,
+            key=key,
+            value=restored_value,
+            version=new_version,
+            written_by=written_by,
+            operation=ContextOperationEnum.rollback,
+        )
+        self._db.add(hist)
+        await self._db.flush()
+
+        if self._redis is not None:
+            asyncio.create_task(
+                _publish_context_event(
+                    self._redis,
+                    tenant_id,
+                    namespace,
+                    key,
+                    value=restored_value,
+                    version=new_version,
+                    written_by=written_by,
+                    event="rollback",
+                )
+            )
+
+        return entry, hist
 
 
 async def cleanup_expired(db: AsyncSession) -> int:

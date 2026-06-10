@@ -11,6 +11,7 @@ from sqlalchemy import (
 from sqlalchemy import (
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -72,6 +73,13 @@ class SessionStatus(str, enum.Enum):
     active = "active"
     closed = "closed"
     archived = "archived"
+
+
+class ContextOperationEnum(str, enum.Enum):
+    created = "created"
+    updated = "updated"
+    deleted = "deleted"
+    rollback = "rollback"
 
 
 class Tenant(Base):
@@ -231,6 +239,35 @@ class ContextEntry(Base):
     )
     updated_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+
+class ContextHistory(Base):
+    __tablename__ = "context_history"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id", "namespace", "key", "version",
+            name="uq_context_history_version",
+        ),
+        Index("ix_context_history_tenant_ns_key", "tenant_id", "namespace", "key"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
+    )
+    namespace: Mapped[str] = mapped_column(Text, nullable=False)
+    key: Mapped[str] = mapped_column(Text, nullable=False)
+    value: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    written_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    operation: Mapped[ContextOperationEnum] = mapped_column(
+        SAEnum(ContextOperationEnum, name="context_operation_enum"), nullable=False
+    )
+    timestamp: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False, server_default=func.now()
     )
 
 
