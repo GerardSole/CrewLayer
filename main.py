@@ -27,6 +27,7 @@ from crewlayer.api.routes import (
 )
 from crewlayer.core.config import settings
 from crewlayer.core.context.blackboard import cleanup_expired
+from crewlayer.core.telemetry.setup import setup_telemetry
 from crewlayer.core.memory.decay import decay_importance, forget_stale_memories
 from crewlayer.core.metrics.collectors import collect_metrics
 from crewlayer.core.streaming.context_broker import ContextBroker
@@ -121,6 +122,7 @@ app = FastAPI(
     lifespan=lifespan,
     dependencies=[Depends(check_rate_limit)],
 )
+setup_telemetry(app)
 
 # Instrument HTTP request metrics — exclude /metrics and /health from tracking
 Instrumentator(

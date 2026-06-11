@@ -4,10 +4,13 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
+from opentelemetry import trace
 from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from crewlayer.db.models import Action, ActionStatus
+
+_tracer = trace.get_tracer("crewlayer.actions")
 
 # ---------------------------------------------------------------------------
 # Cursor helpers — keyset pagination on (timestamp DESC, id DESC)
@@ -82,21 +85,29 @@ class ActionLogger:
         metadata: dict[str, Any] | None = None,
     ) -> Action:
         """Insert an immutable action record and flush (caller must commit)."""
-        action = Action(
-            tenant_id=tenant_id,
-            agent_id=agent_id,
-            session_id=session_id,
-            tool_name=tool_name,
-            input_params=input_params,
-            output_result=output_result,
-            status=status,
-            duration_ms=duration_ms,
-            error_msg=error_msg,
-            metadata_=metadata or {},
-        )
-        self._db.add(action)
-        await self._db.flush()
-        return action
+        with _tracer.start_as_current_span("actions.log") as span:
+            span.set_attribute("tenant_id", str(tenant_id))
+            span.set_attribute("agent_id", str(agent_id))
+            span.set_attribute("tool_name", tool_name)
+            span.set_attribute("status", status.value)
+            if duration_ms is not None:
+                span.set_attribute("duration_ms", duration_ms)
+
+            action = Action(
+                tenant_id=tenant_id,
+                agent_id=agent_id,
+                session_id=session_id,
+                tool_name=tool_name,
+                input_params=input_params,
+                output_result=output_result,
+                status=status,
+                duration_ms=duration_ms,
+                error_msg=error_msg,
+                metadata_=metadata or {},
+            )
+            self._db.add(action)
+            await self._db.flush()
+            return action
 
     async def get(self, tenant_id: uuid.UUID, action_id: uuid.UUID) -> Action | None:
         """Fetch one action, enforcing tenant ownership."""

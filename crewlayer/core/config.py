@@ -18,5 +18,10 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     METRICS_TOKEN: str = ""  # empty = only localhost can reach /metrics
 
+    # OpenTelemetry
+    OTEL_ENABLED: bool = False
+    OTEL_EXPORTER_OTLP_ENDPOINT: str = "http://localhost:4317"
+    OTEL_SERVICE_NAME: str = "crewlayer"
+
 
 settings = Settings()

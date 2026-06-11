@@ -1,8 +1,10 @@
+import hashlib
 import math
 import uuid
 from datetime import UTC, datetime
 from typing import Any
 
+from opentelemetry import trace
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,6 +12,8 @@ from crewlayer.core.config import settings
 from crewlayer.core.embeddings.client import get_embedding
 from crewlayer.core.memory.merger import call_claude_merge, find_near_duplicate
 from crewlayer.db.models import Memory, MemoryStatusEnum
+
+_tracer = trace.get_tracer("crewlayer.memory")
 
 
 class LongMemory:
@@ -40,30 +44,39 @@ class LongMemory:
         """
         vector = await get_embedding(content, self._redis)
 
-        duplicate = await find_near_duplicate(self._db, tenant_id, agent_id, vector)
-        if duplicate is not None:
-            merged_content = await call_claude_merge(duplicate.content, content)
-            merged_base = max(duplicate.base_importance, importance)
-            merged_tags = list({*duplicate.tags, *(tags or [])})
-            merged_vector = await get_embedding(merged_content, self._redis)
+        with _tracer.start_as_current_span("memory.deduplicate") as span:
+            span.set_attribute("tenant_id", str(tenant_id))
+            span.set_attribute("agent_id", str(agent_id))
 
-            duplicate.deleted_at = datetime.now(UTC)
+            duplicate = await find_near_duplicate(self._db, tenant_id, agent_id, vector)
+            span.set_attribute("duplicates_found", 1 if duplicate is not None else 0)
 
-            merged = Memory(
-                tenant_id=tenant_id,
-                agent_id=agent_id,
-                content=merged_content,
-                embedding=merged_vector,
-                importance=merged_base,
-                base_importance=merged_base,
-                access_count=duplicate.access_count,
-                last_accessed=duplicate.last_accessed,
-                tags=merged_tags,
-                merged_from=[duplicate.id],
-            )
-            self._db.add(merged)
-            await self._db.flush()
-            return merged
+            if duplicate is not None:
+                merged_content = await call_claude_merge(duplicate.content, content)
+                merged_base = max(duplicate.base_importance, importance)
+                merged_tags = list({*duplicate.tags, *(tags or [])})
+                merged_vector = await get_embedding(merged_content, self._redis)
+
+                duplicate.deleted_at = datetime.now(UTC)
+
+                merged = Memory(
+                    tenant_id=tenant_id,
+                    agent_id=agent_id,
+                    content=merged_content,
+                    embedding=merged_vector,
+                    importance=merged_base,
+                    base_importance=merged_base,
+                    access_count=duplicate.access_count,
+                    last_accessed=duplicate.last_accessed,
+                    tags=merged_tags,
+                    merged_from=[duplicate.id],
+                )
+                self._db.add(merged)
+                await self._db.flush()
+                span.set_attribute("merges_performed", 1)
+                return merged
+
+            span.set_attribute("merges_performed", 0)
 
         memory = Memory(
             tenant_id=tenant_id,
@@ -96,26 +109,40 @@ class LongMemory:
         if limit is None:
             limit = settings.MAX_MEMORIES_PER_RECALL
 
-        query_vec = await get_embedding(query, self._redis)
+        with _tracer.start_as_current_span("memory.recall") as span:
+            span.set_attribute("tenant_id", str(tenant_id))
+            span.set_attribute("agent_id", str(agent_id))
+            span.set_attribute("query", query[:500])
+            span.set_attribute("top_k", limit)
 
-        stmt = (
-            select(
-                Memory,
-                (1.0 - Memory.embedding.cosine_distance(query_vec)).label("similarity"),
-            )
-            .where(
-                Memory.tenant_id == tenant_id,
-                Memory.agent_id == agent_id,
-                Memory.deleted_at.is_(None),
-                Memory.status == MemoryStatusEnum.active,
-                Memory.embedding.isnot(None),
-            )
-            .order_by(Memory.embedding.cosine_distance(query_vec))
-            .limit(limit)
-        )
-        rows = (await self._db.execute(stmt)).all()
+            # Pre-check the embedding cache to record cache_hit before get_embedding consumes it.
+            cache_key = f"emb:{hashlib.sha256(query.encode()).hexdigest()[:16]}"
+            embedding_cache_hit = False
+            if self._redis is not None:
+                embedding_cache_hit = bool(await self._redis.get(cache_key))
+            span.set_attribute("embedding_cache_hit", embedding_cache_hit)
 
-        results = [(mem, float(sim)) for mem, sim in rows if float(sim) >= min_similarity]
+            query_vec = await get_embedding(query, self._redis)
+
+            stmt = (
+                select(
+                    Memory,
+                    (1.0 - Memory.embedding.cosine_distance(query_vec)).label("similarity"),
+                )
+                .where(
+                    Memory.tenant_id == tenant_id,
+                    Memory.agent_id == agent_id,
+                    Memory.deleted_at.is_(None),
+                    Memory.status == MemoryStatusEnum.active,
+                    Memory.embedding.isnot(None),
+                )
+                .order_by(Memory.embedding.cosine_distance(query_vec))
+                .limit(limit)
+            )
+            rows = (await self._db.execute(stmt)).all()
+
+            results = [(mem, float(sim)) for mem, sim in rows if float(sim) >= min_similarity]
+            span.set_attribute("results_count", len(results))
 
         now = datetime.now(UTC)
         for mem, _ in results:

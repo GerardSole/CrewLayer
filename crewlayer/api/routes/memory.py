@@ -183,7 +183,7 @@ async def extract(
     """Extract facts from a conversation with Claude and persist as long-term memories."""
     await _get_agent(agent_id, tenant.id, db)
     lm = LongMemory(db, redis)
-    memory_ids = await extract_and_save(tenant.id, agent_id, body.conversation, lm)
+    memory_ids = await extract_and_save(tenant.id, agent_id, body.conversation, lm, session_id=body.session_id)
     await db.commit()
     asyncio.create_task(
         dispatch(

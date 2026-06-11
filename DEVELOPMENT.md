@@ -154,7 +154,7 @@ All public endpoints live under `/v1/`. Breaking changes require a new version p
 ## Observability
 
 ```bash
-# Start Prometheus + Grafana
+# Start Prometheus + Grafana + Jaeger
 docker compose -f docker-compose.observability.yml up -d
 ```
 
@@ -166,6 +166,45 @@ Prometheus scrapes `http://host.docker.internal:8000/metrics` every 15 s. Grafan
 3. Select the Prometheus datasource
 
 The dashboard shows: total agents by status, active/archived memories, action log entries, active sessions, HTTP latency p50/p95/p99 per route.
+
+## Distributed tracing with Jaeger
+
+CrewLayer uses OpenTelemetry to emit distributed traces. Traces are disabled by default and enabled via env var.
+
+### Enable tracing
+
+Add to your `.env`:
+
+```env
+OTEL_ENABLED=true
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
+OTEL_SERVICE_NAME=crewlayer
+```
+
+Then start the observability stack (includes Jaeger):
+
+```bash
+docker compose -f docker-compose.observability.yml up -d
+```
+
+### View traces in Jaeger
+
+Open http://localhost:16686. Select **crewlayer** from the *Service* dropdown and click **Find Traces**.
+
+### Custom spans
+
+The following operations produce custom spans with rich attributes:
+
+| Span name | Attributes |
+|---|---|
+| `memory.recall` | `tenant_id`, `agent_id`, `query`, `top_k`, `results_count`, `embedding_cache_hit` |
+| `memory.extract` | `tenant_id`, `agent_id`, `session_id`, `memories_extracted`, `model_used` |
+| `memory.deduplicate` | `tenant_id`, `agent_id`, `duplicates_found`, `merges_performed` |
+| `actions.log` | `tenant_id`, `agent_id`, `tool_name`, `status`, `duration_ms` |
+| `context.write` | `tenant_id`, `namespace`, `key`, `version` |
+| `webhooks.dispatch` | `tenant_id`, `event`, `endpoints_count`, `success_count` |
+
+FastAPI requests, SQLAlchemy queries, and Redis commands are auto-instrumented when `OTEL_ENABLED=true`.
 
 ## MCP Server
 

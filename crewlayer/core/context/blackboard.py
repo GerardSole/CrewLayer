@@ -5,11 +5,14 @@ from contextlib import suppress
 from datetime import UTC, datetime
 from typing import Any
 
+from opentelemetry import trace
 from redis.asyncio import Redis
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from crewlayer.db.models import ContextEntry, ContextHistory, ContextOperationEnum
+
+_tracer = trace.get_tracer("crewlayer.context")
 
 
 class VersionConflictError(Exception):
@@ -98,75 +101,81 @@ class Blackboard:
         Inserts an immutable ContextHistory row in the same transaction.
         Caller must commit after this returns.
         """
-        result = await self._db.execute(
-            select(ContextEntry).where(
-                ContextEntry.tenant_id == tenant_id,
-                ContextEntry.namespace == namespace,
-                ContextEntry.key == key,
-            )
-        )
-        entry = result.scalar_one_or_none()
+        with _tracer.start_as_current_span("context.write") as span:
+            span.set_attribute("tenant_id", str(tenant_id))
+            span.set_attribute("namespace", namespace)
+            span.set_attribute("key", key)
 
-        if entry is None:
-            if expected_version is not None and expected_version != 0:
-                raise VersionConflictError(expected=expected_version, actual=0)
-            operation = ContextOperationEnum.created
-            # If this key existed before and was deleted, continue the version sequence.
-            max_v = (await self._db.execute(
-                select(func.max(ContextHistory.version)).where(
-                    ContextHistory.tenant_id == tenant_id,
-                    ContextHistory.namespace == namespace,
-                    ContextHistory.key == key,
+            result = await self._db.execute(
+                select(ContextEntry).where(
+                    ContextEntry.tenant_id == tenant_id,
+                    ContextEntry.namespace == namespace,
+                    ContextEntry.key == key,
                 )
-            )).scalar_one() or 0
-            new_version = max_v + 1
-            entry = ContextEntry(
+            )
+            entry = result.scalar_one_or_none()
+
+            if entry is None:
+                if expected_version is not None and expected_version != 0:
+                    raise VersionConflictError(expected=expected_version, actual=0)
+                operation = ContextOperationEnum.created
+                # If this key existed before and was deleted, continue the version sequence.
+                max_v = (await self._db.execute(
+                    select(func.max(ContextHistory.version)).where(
+                        ContextHistory.tenant_id == tenant_id,
+                        ContextHistory.namespace == namespace,
+                        ContextHistory.key == key,
+                    )
+                )).scalar_one() or 0
+                new_version = max_v + 1
+                entry = ContextEntry(
+                    tenant_id=tenant_id,
+                    namespace=namespace,
+                    key=key,
+                    value=value,
+                    written_by=written_by,
+                    expires_at=expires_at,
+                    version=new_version,
+                )
+                self._db.add(entry)
+            else:
+                if expected_version is not None and entry.version != expected_version:
+                    raise VersionConflictError(expected=expected_version, actual=entry.version)
+                operation = ContextOperationEnum.updated
+                entry.value = value
+                entry.written_by = written_by
+                entry.expires_at = expires_at
+                entry.version += 1
+                new_version = entry.version
+
+            hist = ContextHistory(
                 tenant_id=tenant_id,
                 namespace=namespace,
                 key=key,
-                value=value,
-                written_by=written_by,
-                expires_at=expires_at,
+                value=dict(value),
                 version=new_version,
+                written_by=written_by,
+                operation=operation,
             )
-            self._db.add(entry)
-        else:
-            if expected_version is not None and entry.version != expected_version:
-                raise VersionConflictError(expected=expected_version, actual=entry.version)
-            operation = ContextOperationEnum.updated
-            entry.value = value
-            entry.written_by = written_by
-            entry.expires_at = expires_at
-            entry.version += 1
-            new_version = entry.version
+            self._db.add(hist)
+            await self._db.flush()
+            span.set_attribute("version", entry.version)
 
-        hist = ContextHistory(
-            tenant_id=tenant_id,
-            namespace=namespace,
-            key=key,
-            value=dict(value),
-            version=new_version,
-            written_by=written_by,
-            operation=operation,
-        )
-        self._db.add(hist)
-        await self._db.flush()
-
-        if self._redis is not None:
-            asyncio.create_task(
-                _publish_context_event(
-                    self._redis,
-                    tenant_id,
-                    namespace,
-                    key,
-                    value=dict(entry.value),
-                    version=entry.version,
-                    written_by=written_by,
-                    event="updated",
+            if self._redis is not None:
+                asyncio.create_task(
+                    _publish_context_event(
+                        self._redis,
+                        tenant_id,
+                        namespace,
+                        key,
+                        value=dict(entry.value),
+                        version=entry.version,
+                        written_by=written_by,
+                        event="updated",
+                    )
                 )
-            )
 
-        return entry
+            return entry
 
     async def read(
         self,

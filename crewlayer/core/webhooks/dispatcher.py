@@ -7,12 +7,15 @@ from datetime import UTC, datetime
 from typing import Any
 
 import httpx
+from opentelemetry import trace
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
 from crewlayer.core.config import settings
 from crewlayer.db.models import DeliveryStatus, WebhookDelivery, WebhookEndpoint
+
+_tracer = trace.get_tracer("crewlayer.webhooks")
 
 _MAX_ATTEMPTS = 3
 
@@ -32,29 +35,37 @@ async def dispatch(
     Returns the list of spawned delivery tasks so callers (e.g. tests) can
     await them. Production routes should fire-and-forget via asyncio.create_task.
     """
-    async with _session_factory() as db:
-        result = await db.execute(
-            select(WebhookEndpoint).where(
-                WebhookEndpoint.tenant_id == tenant_id,
-                WebhookEndpoint.active.is_(True),
-                WebhookEndpoint.events.contains([event]),  # events @> ARRAY['event']
-            )
-        )
-        endpoints = list(result.scalars().all())
+    with _tracer.start_as_current_span("webhooks.dispatch") as span:
+        span.set_attribute("tenant_id", str(tenant_id))
+        span.set_attribute("event", event)
 
-    tasks: list[asyncio.Task[None]] = []
-    for endpoint in endpoints:
-        task = asyncio.create_task(
-            _deliver_with_retry(
-                endpoint_id=endpoint.id,
-                url=endpoint.url,
-                secret=endpoint.secret,
-                event=event,
-                payload=payload,
+        async with _session_factory() as db:
+            result = await db.execute(
+                select(WebhookEndpoint).where(
+                    WebhookEndpoint.tenant_id == tenant_id,
+                    WebhookEndpoint.active.is_(True),
+                    WebhookEndpoint.events.contains([event]),  # events @> ARRAY['event']
+                )
             )
-        )
-        tasks.append(task)
-    return tasks
+            endpoints = list(result.scalars().all())
+
+        span.set_attribute("endpoints_count", len(endpoints))
+
+        tasks: list[asyncio.Task[None]] = []
+        for endpoint in endpoints:
+            task = asyncio.create_task(
+                _deliver_with_retry(
+                    endpoint_id=endpoint.id,
+                    url=endpoint.url,
+                    secret=endpoint.secret,
+                    event=event,
+                    payload=payload,
+                )
+            )
+            tasks.append(task)
+
+        span.set_attribute("success_count", len(tasks))
+        return tasks
 
 
 async def _deliver_with_retry(
