@@ -18,7 +18,13 @@ dependencies = [
 langchain = ["langchain-core>=0.2.0"]
 crewai = ["crewai>=0.28.0"]
 llamaindex = ["llama-index-core>=0.10.0"]
-all-integrations = ["langchain-core>=0.2.0", "crewai>=0.28.0", "llama-index-core>=0.10.0"]
+autogen = ["pyautogen>=0.2.0"]
+all-integrations = [
+    "langchain-core>=0.2.0",
+    "crewai>=0.28.0",
+    "llama-index-core>=0.10.0",
+    "pyautogen>=0.2.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/your-org/crewlayer"

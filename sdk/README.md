@@ -515,3 +515,144 @@ handler = CrewLayerCallbackManager(
 )
 llm = OpenAI(callback_manager=CallbackManager([handler]))
 ```
+
+---
+
+### AutoGen (Microsoft)
+
+> **This is where CrewLayer makes the biggest difference.**
+> Multi-agent workflows need a shared, persistent blackboard so every agent
+> can see what others are doing — without passing giant context windows around.
+> `CrewLayerGroupChatManager` maintains that blackboard automatically after
+> every turn.  Any agent (or external observer) can call
+> `client.context.read(group_id, "latest_turn")` to get the current state.
+
+Install the extra:
+
+```bash
+pip install crewlayer[autogen]
+```
+
+#### `CrewLayerConversableAgent` — auto-persist every message
+
+Drop-in replacement for `autogen.ConversableAgent`.  Every message sent or
+received is automatically:
+- appended to CrewLayer short-term memory (durable conversation history)
+- logged as an action entry (full audit trail with `duration_ms`)
+
+The incoming message is saved to memory *before* AutoGen processes it, so the
+history survives even if the LLM call later raises.
+
+```python
+from crewlayer import CrewLayerClient
+from crewlayer.integrations.autogen import CrewLayerConversableAgent
+import autogen
+
+client = CrewLayerClient(api_key="crwl_...")
+
+researcher = CrewLayerConversableAgent(
+    name="researcher",
+    client=client,
+    agent_id="<uuid-researcher>",
+    session_id="project-alpha",   # groups this conversation in short-term memory
+    system_message="You are a research assistant.",
+    llm_config={"config_list": [{"model": "gpt-4", "api_key": "..."}]},
+)
+
+writer = CrewLayerConversableAgent(
+    name="writer",
+    client=client,
+    agent_id="<uuid-writer>",
+    session_id="project-alpha",
+    system_message="You are a technical writer.",
+    llm_config={"config_list": [{"model": "gpt-4", "api_key": "..."}]},
+)
+
+# Every send/receive is automatically logged
+researcher.initiate_chat(writer, message="Summarise the latest CrewLayer release.")
+```
+
+#### `CrewLayerGroupChatManager` — shared blackboard for multi-agent groups
+
+Extends `autogen.GroupChatManager`.  After **every turn** in the group chat,
+two blackboard entries are written to the shared namespace:
+
+| Key | Value |
+|-----|-------|
+| `latest_turn` | `{agent, content, turn}` — last speaker + message |
+| `agent:{name}` | `{last_message, turn}` — per-agent most recent message |
+
+Any agent or external service can read the live group state without being
+part of the conversation.
+
+```python
+from crewlayer.integrations.autogen import (
+    CrewLayerGroupChatManager,
+    CrewLayerAgentMemory,
+    sync_agent_status,
+)
+
+groupchat = autogen.GroupChat(
+    agents=[researcher, writer],
+    messages=[],
+    max_round=12,
+)
+manager = CrewLayerGroupChatManager(
+    client=client,
+    group_id="project-alpha",    # blackboard namespace
+    groupchat=groupchat,
+    llm_config={"config_list": [{"model": "gpt-4", "api_key": "..."}]},
+)
+
+researcher.initiate_chat(manager, message="Let's plan the next release.")
+
+# From anywhere — check who spoke last and what they said
+state = manager.get_shared_context()
+for entry in state.entries:
+    print(f"{entry.key}: {entry.value}")
+
+# Or read directly
+latest = client.context.read("project-alpha", "latest_turn")
+print(f"{latest.value['agent']}: {latest.value['content']}")
+```
+
+#### `CrewLayerAgentMemory` — load long-term memories as initial context
+
+Enriches an agent's system message with relevant long-term memories before
+the conversation starts.  Gives agents continuity across sessions without
+manually managing context.
+
+```python
+from crewlayer.integrations.autogen import CrewLayerAgentMemory
+
+# Load up to 5 memories relevant to "research context and history"
+CrewLayerAgentMemory(
+    client=client,
+    agent_id="<uuid-researcher>",
+    query="research context and history",
+    limit=5,
+).apply(researcher)   # prepends bullet-point memories to system_message
+
+# Now start the chat — the researcher already knows its history
+researcher.initiate_chat(manager, message="Continue from last time.")
+```
+
+#### `sync_agent_status` — keep CrewLayer in sync with AutoGen state
+
+Maps AutoGen thinking/idle states to CrewLayer's `working`/`idle`/`error`
+enum.  Call it around LLM calls to get real-time status in dashboards.
+
+| AutoGen string | CrewLayer status |
+|----------------|-----------------|
+| `thinking`, `replying`, `generating`, `processing` | `working` |
+| `idle`, `waiting` | `idle` |
+| `error` | `error` |
+
+```python
+from crewlayer.integrations.autogen import sync_agent_status
+
+sync_agent_status(client, agent_id="<uuid-researcher>", autogen_status="thinking")
+response = researcher.generate_reply(messages)
+sync_agent_status(client, agent_id="<uuid-researcher>", autogen_status="idle")
+```
+```
