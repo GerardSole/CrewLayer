@@ -296,6 +296,112 @@ El dashboard incluye: latencia HTTP (p50/p95/p99), memories activas vs archivada
 
 ---
 
+## CLI
+
+The official command-line interface lets you manage CrewLayer resources from your terminal without writing code.
+
+### Install
+
+```bash
+pip install crewlayer[cli]
+# or, from source:
+pip install -e ".[cli]"
+```
+
+### Setup
+
+```bash
+crewlayer init
+```
+
+Runs an interactive wizard — enter the API base URL and your API key. Config is saved to `~/.crewlayer/config.json`.
+
+```
+CrewLayer Setup Wizard
+──────────────────────
+API base URL [http://localhost:8000]:
+API key: ****
+
+✓ Connection OK
+Config saved to /home/user/.crewlayer/config.json
+```
+
+### Tenants & keys
+
+```bash
+# Create a new tenant (prints a bootstrap API key — save it!)
+crewlayer tenants create --name "mi proyecto"
+
+# Create a scoped API key for production
+crewlayer keys create --name "produccion" --scopes "memory:read,memory:write"
+
+# List all keys
+crewlayer keys list
+```
+
+### Agents
+
+```bash
+# List all agents (optional tag filter)
+crewlayer agents list
+crewlayer agents list --tags produccion
+crewlayer agents list --status error
+
+# Create an agent
+crewlayer agents create --name "asistente" --tags "ventas,soporte"
+
+# Check status (Redis-cached idle/working/error)
+crewlayer agents status <agent_id>
+```
+
+### Memory
+
+```bash
+# Semantic recall
+crewlayer memory recall <agent_id> "preferencias del usuario"
+crewlayer memory recall <agent_id> "historial de compras" --limit 5
+
+# List memories (paginated)
+crewlayer memory list <agent_id>
+crewlayer memory list <agent_id> --limit 50 --archived
+```
+
+### Actions
+
+```bash
+# List action history
+crewlayer actions list <agent_id>
+crewlayer actions list <agent_id> --status error --limit 50
+
+# Aggregate stats (error rate, avg duration, per-tool breakdown)
+crewlayer actions stats <agent_id>
+```
+
+### Export / Import
+
+```bash
+# Export full agent backup (memories, actions, episodes, …)
+crewlayer export <agent_id> --output agent_backup.json
+
+# Import into the same or a different tenant (creates a new agent ID)
+crewlayer import agent_backup.json
+```
+
+### JSON output for pipelines
+
+Every list and status command accepts `--json` to print raw JSON to stdout:
+
+```bash
+# Pipe into jq
+crewlayer agents list --json | jq '.[].id'
+
+# Use in scripts
+AGENT_ID=$(crewlayer agents create --name "bot" --json | jq -r '.id')
+crewlayer memory recall "$AGENT_ID" "context" --json | jq '.results[].content'
+```
+
+---
+
 ## Running tests
 
 ```bash
@@ -303,7 +409,7 @@ pip install -e ".[dev]"
 pytest tests/ -v
 ```
 
-240 tests run against a real PostgreSQL and Redis instance (no mocks for infrastructure).
+284 tests run against a real PostgreSQL and Redis instance (no mocks for infrastructure). CLI tests use httpx mocks and require no running server.
 
 ---
 
