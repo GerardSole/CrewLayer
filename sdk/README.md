@@ -273,3 +273,147 @@ client = CrewLayerClient(
     base_url="https://api.your-deployment.com",  # default: http://localhost:8000
 )
 ```
+
+---
+
+## Integrations
+
+### LangChain
+
+Install the extra:
+
+```bash
+pip install crewlayer[langchain]
+```
+
+#### `AgentLayerMemory` — `BaseChatMemory` backed by CrewLayer
+
+Plug-and-play replacement for `ConversationBufferMemory`. Messages are persisted in CrewLayer's
+Redis session store and rehydrated on every chain call.
+
+```python
+from crewlayer import CrewLayerClient
+from crewlayer.integrations.langchain import AgentLayerMemory
+from langchain.chains import ConversationChain
+from langchain_openai import ChatOpenAI
+
+client = CrewLayerClient(api_key="crwl_...")
+memory = AgentLayerMemory(
+    client=client,
+    agent_id="agent-uuid",
+    session_id="user-123",    # one session per user / conversation
+    memory_key="history",     # must match your prompt template
+    return_messages=True,     # return Message objects (default); False = plain string
+)
+
+chain = ConversationChain(llm=ChatOpenAI(), memory=memory)
+chain.predict(input="What's the capital of France?")
+```
+
+#### `AgentLayerVectorStore` — LangChain `VectorStore` backed by pgvector
+
+`similarity_search` delegates to CrewLayer semantic recall (cosine similarity via pgvector).
+`add_texts` persists texts as long-term memories via the extract endpoint.
+
+```python
+from crewlayer.integrations.langchain import AgentLayerVectorStore
+
+store = AgentLayerVectorStore(client=client, agent_id="agent-uuid", k=4)
+
+# Add documents (stored as long-term memories)
+store.add_texts(["User prefers dark mode", "User is a Python developer"])
+
+# Semantic search
+docs = store.similarity_search("programming preferences", k=3)
+for doc in docs:
+    print(f"[{doc.metadata['similarity']:.2f}] {doc.page_content}")
+
+# With scores
+results = store.similarity_search_with_score("dark mode", k=2)
+for doc, score in results:
+    print(f"[{score:.2f}] {doc.page_content}")
+```
+
+#### `AgentLayerCallbackHandler` — auto-log every tool call
+
+Attach to any chain or agent executor to automatically record tool invocations as
+CrewLayer action entries (name, input, output, duration).
+
+```python
+from crewlayer.integrations.langchain import AgentLayerCallbackHandler
+from langchain.agents import AgentExecutor
+
+handler = AgentLayerCallbackHandler(
+    client=client,
+    agent_id="agent-uuid",
+    session_id="session-abc",  # optional
+)
+
+agent_executor = AgentExecutor(agent=agent, tools=tools)
+agent_executor.invoke({"input": "Search the web for X"}, config={"callbacks": [handler]})
+```
+
+---
+
+### CrewAI
+
+Install the extra:
+
+```bash
+pip install crewlayer[crewai]
+```
+
+#### `AgentLayerMemoryProvider` — CrewAI storage backed by CrewLayer
+
+Implements the CrewAI `Storage` interface (`save` / `search` / `reset`).
+Pass it as the `storage=` argument to any CrewAI memory class.
+
+```python
+from crewlayer import CrewLayerClient
+from crewlayer.integrations.crewai import AgentLayerMemoryProvider
+from crewai.memory import LongTermMemory
+
+client = CrewLayerClient(api_key="crwl_...")
+storage = AgentLayerMemoryProvider(
+    client=client,
+    agent_id="agent-uuid",
+    session_id="default",     # session for short-term writes
+    recall_limit=5,           # default number of results from search()
+    min_similarity=0.35,      # minimum cosine similarity for recall
+)
+ltm = LongTermMemory(storage=storage)
+```
+
+Direct usage (without a CrewAI memory wrapper):
+
+```python
+storage.save("The user prefers Python over JavaScript", metadata={"source": "chat"})
+results = storage.search("programming language preferences", limit=3)
+for r in results:
+    print(f"[{r['score']:.2f}] {r['memory']}")
+```
+
+#### `AgentLayerTaskLogger` — log every CrewAI task completion
+
+Pass an instance as `callback=` on any `Task`.  When the task finishes, the result is
+recorded as a CrewLayer action entry (tool_name = task description, status = success).
+
+```python
+from crewlayer.integrations.crewai import AgentLayerTaskLogger
+from crewai import Agent, Task, Crew
+
+logger = AgentLayerTaskLogger(
+    client=client,
+    agent_id="agent-uuid",
+    session_id="session-abc",  # optional
+)
+
+task = Task(
+    description="Summarize customer feedback",
+    expected_output="A short paragraph summary",
+    agent=my_agent,
+    callback=logger,
+)
+crew = Crew(agents=[my_agent], tasks=[task])
+crew.kickoff()
+```
