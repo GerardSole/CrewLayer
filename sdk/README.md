@@ -417,3 +417,101 @@ task = Task(
 crew = Crew(agents=[my_agent], tasks=[task])
 crew.kickoff()
 ```
+
+---
+
+### LlamaIndex
+
+Install the extra:
+
+```bash
+pip install crewlayer[llamaindex]
+```
+
+#### `CrewLayerMemoryBuffer` — `BaseMemory` backed by CrewLayer
+
+Drop-in replacement for `ChatMemoryBuffer`.  Each `put()` appends to the
+agent's Redis session store; `get()` fetches recent messages as `ChatMessage` objects.
+
+```python
+from crewlayer import CrewLayerClient
+from crewlayer.integrations.llamaindex import CrewLayerMemoryBuffer
+from llama_index.core.chat_engine import CondenseQuestionChatEngine
+
+client = CrewLayerClient(api_key="crwl_...")
+memory = CrewLayerMemoryBuffer(
+    client=client,
+    agent_id="agent-uuid",
+    session_id="user-123",  # one session per user / conversation
+    limit=50,               # max messages returned by get()
+)
+
+# Use directly
+memory.put(ChatMessage(role="user", content="Hello!"))
+msgs = memory.get()
+```
+
+#### `CrewLayerVectorIndex` — index backed by pgvector semantic recall
+
+`insert()` persists documents as long-term memories via the extract endpoint.
+`similarity_search()` delegates to CrewLayer's pgvector cosine similarity.
+`as_query_engine()` returns a `CrewLayerQueryEngine` that logs every query
+as a `llamaindex.query` action.
+
+```python
+from crewlayer.integrations.llamaindex import CrewLayerVectorIndex
+from llama_index.core.schema import Document
+
+index = CrewLayerVectorIndex(
+    client=client,
+    agent_id="agent-uuid",
+    similarity_top_k=4,     # default number of results
+    min_similarity=0.0,     # minimum cosine similarity
+)
+
+# Add documents
+index.insert(Document(text="The user's name is Alice and she prefers dark mode."))
+
+# Direct similarity search (returns MemoryItem list)
+items = index.similarity_search("user interface preferences", top_k=3)
+for item in items:
+    print(f"[{item.similarity:.2f}] {item.content}")
+```
+
+#### `CrewLayerQueryEngine` — query engine with automatic action logging
+
+Returned by `index.as_query_engine()`.  Every `query()` call retrieves
+memories, logs a `llamaindex.query` action (including duration and result
+count), and returns a `QueryResponse` with `.response` (str) and
+`.source_nodes` (list of `MemoryItem`).
+
+```python
+engine = index.as_query_engine(
+    session_id="session-abc",   # optional, associated with logged actions
+    similarity_top_k=5,         # overrides index default
+)
+
+response = engine.query("¿qué recuerdas sobre el cliente?")
+print(response.response)         # concatenated memory contents
+print(len(response.source_nodes))  # number of memories retrieved
+```
+
+#### `CrewLayerCallbackManager` — log LLM and tool calls
+
+Implements `BaseCallbackHandler`.  Add it to LlamaIndex's `CallbackManager`
+to automatically record every LLM call, function call, and agent step as
+an action entry (tool_names: `llamaindex.llm`, `llamaindex.function_call`,
+`llamaindex.agent_step`).
+
+```python
+from crewlayer.integrations.llamaindex import CrewLayerCallbackManager
+from llama_index.core.callbacks import CallbackManager
+from llama_index.llms.openai import OpenAI
+
+handler = CrewLayerCallbackManager(
+    client=client,
+    agent_id="agent-uuid",
+    session_id="session-abc",  # optional
+)
+llm = OpenAI(callback_manager=CallbackManager([handler]))
+```
