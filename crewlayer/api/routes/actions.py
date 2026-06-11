@@ -3,7 +3,8 @@ import uuid
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
+from sse_starlette.sse import EventSourceResponse  # type: ignore[attr-defined]
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,12 +14,21 @@ from crewlayer.api.schemas.actions import (
     ActionListResponse,
     ActionResponse,
     ActionStatsResponse,
+    ReplayCreate,
+    ReplayListResponse,
+    ReplayResponse,
     ToolStatResponse,
 )
 from crewlayer.core.actions.alerts import check_and_fire_alerts
 from crewlayer.core.actions.logger import ActionFilters, ActionLogger
+from crewlayer.core.actions.replay import (
+    create_replay,
+    get_replay,
+    list_replays,
+    replay_event_stream,
+)
 from crewlayer.core.webhooks.dispatcher import dispatch
-from crewlayer.db.models import ActionStatus, Agent, Session, SessionStatus
+from crewlayer.db.models import ActionStatus, Agent, Replay, ReplayStatusEnum, Session, SessionStatus
 
 router = APIRouter()
 
@@ -191,3 +201,109 @@ async def list_actions(
         count=len(actions),
         next_cursor=next_cursor,
     )
+
+
+# ─── Replay endpoints ─────────────────────────────────────────────────────────
+
+
+async def _get_replay_or_404(
+    agent_id: uuid.UUID,
+    tenant_id: uuid.UUID,
+    replay_id: uuid.UUID,
+    db: AsyncSession,
+) -> Replay:
+    replay = await get_replay(db, tenant_id, agent_id, replay_id)
+    if replay is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Replay no encontrado")
+    return replay
+
+
+@router.post(
+    "/agents/{agent_id}/replays",
+    status_code=status.HTTP_201_CREATED,
+    response_model=ReplayResponse,
+    dependencies=[check_scope("actions:read")],
+)
+async def create_replay_job(
+    agent_id: uuid.UUID,
+    body: ReplayCreate,
+    tenant: TenantDep,
+    db: DbDep,
+) -> ReplayResponse:
+    """Create a pending replay job for a time window of an agent's actions."""
+    await _get_agent(agent_id, tenant.id, db)
+    replay = await create_replay(
+        db,
+        tenant_id=tenant.id,
+        agent_id=agent_id,
+        from_timestamp=body.from_timestamp,
+        to_timestamp=body.to_timestamp,
+        speed=body.speed,
+    )
+    await db.commit()
+    await db.refresh(replay)
+    return ReplayResponse.model_validate(replay)
+
+
+@router.get(
+    "/agents/{agent_id}/replays",
+    response_model=ReplayListResponse,
+    dependencies=[check_scope("actions:read")],
+)
+async def list_agent_replays(
+    agent_id: uuid.UUID,
+    tenant: TenantDep,
+    db: DbDep,
+) -> ReplayListResponse:
+    """List all replay jobs for an agent, newest first."""
+    await _get_agent(agent_id, tenant.id, db)
+    replays = await list_replays(db, tenant.id, agent_id)
+    return ReplayListResponse(
+        items=[ReplayResponse.model_validate(r) for r in replays],
+        count=len(replays),
+    )
+
+
+@router.get(
+    "/agents/{agent_id}/replays/{replay_id}",
+    response_model=ReplayResponse,
+    dependencies=[check_scope("actions:read")],
+)
+async def get_replay_detail(
+    agent_id: uuid.UUID,
+    replay_id: uuid.UUID,
+    tenant: TenantDep,
+    db: DbDep,
+) -> ReplayResponse:
+    """Get a single replay job by ID."""
+    await _get_agent(agent_id, tenant.id, db)
+    replay = await _get_replay_or_404(agent_id, tenant.id, replay_id, db)
+    return ReplayResponse.model_validate(replay)
+
+
+@router.get(
+    "/agents/{agent_id}/replays/{replay_id}/stream",
+    dependencies=[check_scope("actions:read")],
+)
+async def stream_replay(
+    agent_id: uuid.UUID,
+    replay_id: uuid.UUID,
+    tenant: TenantDep,
+    db: DbDep,
+    request: Request,
+) -> EventSourceResponse:
+    """Stream a replay job as SSE events in chronological order.
+
+    Emits one ``action`` event per recorded action (respecting the configured
+    speed multiplier), then a final ``completed`` event when done.
+    Replay transitions: pending/completed/failed → running → completed.
+    Returns 409 if the replay is already running.
+    """
+    await _get_agent(agent_id, tenant.id, db)
+    replay = await _get_replay_or_404(agent_id, tenant.id, replay_id, db)
+    if replay.status == ReplayStatusEnum.running:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="El replay ya está en ejecución",
+        )
+    return EventSourceResponse(replay_event_stream(db, replay, request.is_disconnected))

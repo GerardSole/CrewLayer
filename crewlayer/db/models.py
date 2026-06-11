@@ -94,6 +94,13 @@ class AgentRelationTypeEnum(str, enum.Enum):
     delegate = "delegate"
 
 
+class ReplayStatusEnum(str, enum.Enum):
+    pending = "pending"
+    running = "running"
+    completed = "completed"
+    failed = "failed"
+
+
 class Tenant(Base):
     __tablename__ = "tenants"
 
@@ -463,3 +470,31 @@ class EpisodeMemory(Base):
     added_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), nullable=False, server_default=func.now()
     )
+
+
+class Replay(Base):
+    __tablename__ = "replays"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    agent_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("agents.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    status: Mapped[ReplayStatusEnum] = mapped_column(
+        SAEnum(ReplayStatusEnum, name="replay_status_enum"),
+        nullable=False,
+        server_default=ReplayStatusEnum.pending.value,
+    )
+    from_timestamp: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False)
+    to_timestamp: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False)
+    speed: Mapped[float] = mapped_column(Float, nullable=False, server_default="1.0")
+    action_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False, server_default=func.now()
+    )
+    started_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
