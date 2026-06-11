@@ -95,9 +95,10 @@ crewlayer/
 │   ├── middleware/      # ASGI middleware (audit log, rate limiting)
 │   └── deps.py          # Shared FastAPI dependencies (auth, db, redis, check_scope)
 ├── core/
-│   ├── memory/          # Short (Redis), long (pgvector), extractor, merger, decay
-│   ├── actions/         # Action logger
-│   ├── context/         # Shared blackboard
+│   ├── memory/          # Short (Redis), long (pgvector), extractor, merger, decay, episodic
+│   ├── actions/         # Action logger, alert checker
+│   ├── agents/          # Relations (hierarchy), portability (export/import)
+│   ├── context/         # Shared blackboard + history
 │   ├── embeddings/      # Embedding generation with Redis cache
 │   ├── metrics/         # Custom Prometheus gauges (collectors.py)
 │   ├── streaming/       # Pub/sub broker (broker.py, context_broker.py)
@@ -105,15 +106,17 @@ crewlayer/
 │   ├── config.py        # pydantic-settings config
 │   ├── redis.py         # Redis connection pool
 │   └── security.py      # bcrypt helpers
+├── cli/                 # Official CLI (typer + rich); entry: crewlayer.cli.main:app
 ├── db/
 │   ├── models.py        # SQLAlchemy ORM models (all enums + tables)
 │   ├── session.py       # Async session factory
-│   └── alembic/versions/  # Alembic migrations (head: b8c9d0e1f2a3)
+│   └── alembic/versions/  # Alembic migrations (head: f2a3b4c5d6e7)
 mcp/                     # MCP server (FastMCP, 9 tools)
 sdk/                     # Installable Python SDK
+sdk-typescript/          # TypeScript/JavaScript SDK (Node.js 18+ + browser)
 observability/           # Grafana dashboard JSON
 scripts/                 # Utility scripts (seed, etc.)
-tests/                   # pytest test suite (240 tests)
+tests/                   # pytest test suite (316+ tests)
 docker-compose.yml                  # Main stack (Postgres + Redis)
 docker-compose.observability.yml    # Prometheus + Grafana
 main.py                  # FastAPI app + lifespan (background tasks)
@@ -125,7 +128,7 @@ main.py                  # FastAPI app + lifespan (background tasks)
 2. Add Pydantic schemas in `crewlayer/api/schemas/<module>.py`
 3. Put business logic in `crewlayer/core/` (not in the route)
 4. Write a test in `tests/test_<module>.py`
-5. If the SDK should expose the new endpoint, update `sdk/crewlayer/`
+5. Update both SDKs: `sdk/crewlayer/` (Python) and `sdk-typescript/src/resources/` (TypeScript)
 
 ## API versioning
 
@@ -148,29 +151,29 @@ All public endpoints live under `/v1/`. Breaking changes require a new version p
 | `MCP_TRANSPORT` | No | `stdio` (default) or `sse` |
 | `CREWLAYER_API_KEY` | No | API key used by the MCP server to call the REST API |
 
-## Observabilidad
+## Observability
 
 ```bash
-# Levantar Prometheus + Grafana
+# Start Prometheus + Grafana
 docker compose -f docker-compose.observability.yml up -d
 ```
 
 Prometheus scrapes `http://host.docker.internal:8000/metrics` every 15 s. Grafana runs on http://localhost:3000 (admin/admin).
 
-**Importar el dashboard:**
+**Import the dashboard:**
 1. Grafana → Dashboards → Import
-2. Subir `observability/grafana/dashboards/crewlayer.json`
-3. Seleccionar el datasource Prometheus
+2. Upload `observability/grafana/dashboards/crewlayer.json`
+3. Select the Prometheus datasource
 
-El dashboard muestra: total agents por status, memories activas/archivadas, action log entries, sesiones activas, latencia HTTP p50/p95/p99 por ruta.
+The dashboard shows: total agents by status, active/archived memories, action log entries, active sessions, HTTP latency p50/p95/p99 per route.
 
 ## MCP Server
 
-El servidor MCP expone las funciones de CrewLayer como herramientas para Claude.
+The MCP server exposes CrewLayer functions as tools for Claude.
 
-### Probar con Claude Code (CLI)
+### Claude Code (CLI)
 
-Añadir al fichero de configuración MCP de Claude Code (`~/.claude/mcp_settings.json` o equivalente):
+Add to the Claude Code MCP config (`~/.claude/mcp_settings.json` or equivalent):
 
 ```json
 {
@@ -178,7 +181,7 @@ Añadir al fichero de configuración MCP de Claude Code (`~/.claude/mcp_settings
     "crewlayer": {
       "command": "python",
       "args": ["-m", "mcp.server"],
-      "cwd": "/ruta/a/CrewLayer",
+      "cwd": "/path/to/CrewLayer",
       "env": {
         "CREWLAYER_API_KEY": "crwl_...",
         "CREWLAYER_BASE_URL": "http://localhost:8000"
@@ -188,30 +191,107 @@ Añadir al fichero de configuración MCP de Claude Code (`~/.claude/mcp_settings
 }
 ```
 
-### Probar con Claude Desktop
+### Claude Desktop
 
-Añadir en `claude_desktop_config.json`:
+Add the same `mcpServers` block to `~/Library/Application Support/Claude/claude_desktop_config.json` (Mac) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows).
 
-```json
-{
-  "mcpServers": {
-    "crewlayer": {
-      "command": "python",
-      "args": ["-m", "mcp.server"],
-      "cwd": "/ruta/a/CrewLayer",
-      "env": {
-        "CREWLAYER_API_KEY": "crwl_...",
-        "CREWLAYER_BASE_URL": "http://localhost:8000"
-      }
-    }
-  }
-}
-```
-
-### Modo SSE (Docker)
+### SSE mode (Docker)
 
 ```bash
 MCP_TRANSPORT=sse MCP_PORT=8001 python -m mcp.server
 ```
 
-O usando el servicio `mcp` en `docker-compose.yml`.
+Or use the `mcp` service in `docker-compose.yml`.
+
+## CLI
+
+The official CLI lets you manage CrewLayer resources from the terminal without writing code.
+
+### Install
+
+```bash
+# With the CLI extras (typer + rich):
+pip install -e ".[cli]"
+
+# Or from PyPI once published:
+pip install crewlayer[cli]
+```
+
+### Setup wizard
+
+```bash
+crewlayer init
+```
+
+Prompts for the API base URL and your API key, tests the connection, and saves config to `~/.crewlayer/config.json`.
+
+### Common commands
+
+```bash
+# Tenants & keys
+crewlayer tenants create --name "my-project"
+crewlayer keys create --name "prod" --scopes "memory:read,memory:write"
+crewlayer keys list
+
+# Agents
+crewlayer agents list --status idle --tags production
+crewlayer agents create --name "research-bot" --tags "research"
+crewlayer agents status <agent_id>
+
+# Memory
+crewlayer memory recall <agent_id> "user preferences" --limit 5
+crewlayer memory list <agent_id> --archived
+
+# Actions
+crewlayer actions list <agent_id> --status error
+crewlayer actions stats <agent_id>
+
+# Export / Import (portability)
+crewlayer export <agent_id> --output agent_backup.json
+crewlayer import agent_backup.json
+
+# Pipeline / CI — every command supports --json
+crewlayer agents list --json | jq '.[].id'
+AGENT=$(crewlayer agents create --name "bot" --json | jq -r '.id')
+```
+
+## TypeScript SDK
+
+The TypeScript SDK lives in `sdk-typescript/`. It targets Node.js 18+ and modern browsers (uses native `fetch`).
+
+### Build
+
+```bash
+cd sdk-typescript
+npm install
+npm run build      # tsup → dist/index.mjs (ESM) + dist/index.js (CJS) + .d.ts
+npm run typecheck  # tsc --noEmit
+```
+
+### Tests
+
+```bash
+npm test           # vitest run (72 tests, all mocked fetch — no server needed)
+npm run test:watch # interactive watch mode
+```
+
+All tests mock `globalThis.fetch` via `vi.stubGlobal`. No running server or database required.
+
+### Publish to npm
+
+```bash
+cd sdk-typescript
+npm run build
+npm publish        # publishes ./dist contents per package.json "files"
+```
+
+### Background embedding regeneration
+
+When `POST /v1/agents/import` is called, the server returns immediately after writing all rows to the database. Embeddings are regenerated in a background task (`asyncio.create_task`) using a separate `AsyncSessionLocal()`. You can verify it is running by watching the application logs:
+
+```
+INFO  regenerating embeddings for 42 imported memories
+INFO  embedding regeneration complete (42/42)
+```
+
+If the server restarts before regeneration finishes, recall results for imported memories will be incorrect until you manually trigger extraction. The `id_map` in the import response gives you the new memory IDs to check.

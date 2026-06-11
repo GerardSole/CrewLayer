@@ -8,34 +8,39 @@ CrewLayer is a stateless FastAPI application backed by PostgreSQL (via pgvector)
 Claude Desktop / Claude Code
         │ stdio or SSE
         ▼
-   MCP Server                         Prometheus ◄── /metrics (token-auth)
-   (mcp/server.py)                        │
+   MCP Server (mcp/server.py)         Prometheus ◄── /metrics (token-auth)
         │ HTTP internal                   │
         ▼                             Grafana dashboard
-Client / Agent SDK
-        │
-        ▼
-   FastAPI (async)
-        │
-   ┌────┴──────────────────────────────────────────────────┐
-   │  API Layer  (crewlayer/api/)                          │
-   │  ┌────────┬──────────┬──────────┬────────┬─────────┐  │
-   │  │  auth  │  agents  │  memory  │actions │ context │  │
-   │  │  audit │ sessions │ webhooks │ usage  │ metrics │  │
-   │  └────┬───┴────┬─────┴─────┬────┴───┬────┴────┬────┘  │
-   └───────┼────────┼───────────┼────────┼─────────┼───────┘
-           │        │           │        │         │
-      ┌────▼──┐  ┌──▼───┐  ┌───▼────┐ ┌─▼───┐  ┌─▼──────┐
-      │Audit  │  │ ORM  │  │ Memory │ │Actn │  │Context │
-      │Middle-│  │Models│  │ Engine │ │Logr │  │Broker  │
-      │ ware  │  │      │  │(short/ │ │     │  │(pub/sub│
-      └───────┘  └──┬───┘  │long/   │ └─────┘  │→ SSE)  │
-                    │      │ decay) │           └───┬────┘
-              ┌─────▼──┐   └───┬────┘               │
-              │Postgres│       │              ┌──────▼──┐
-              │+pgvec  │◄──────┘              │  Redis  │
-              └────────┘                      │(pub/sub)│
-                                              └─────────┘
+Python SDK (sdk/)  TypeScript SDK (sdk-typescript/)  CLI (crewlayer cli)
+        │                    │                │
+        └────────────────────┴────────────────┘
+                             │ HTTP (X-API-Key)
+                             ▼
+                       FastAPI (async)
+                             │
+        ┌────────────────────┴────────────────────────────────────────┐
+        │  API Layer  (crewlayer/api/)                                │
+        │  ┌────────┬──────────┬──────────┬────────┬─────────────┐   │
+        │  │  auth  │  agents  │  memory  │actions │   context   │   │
+        │  │  audit │ sessions │ webhooks │ usage  │   metrics   │   │
+        │  │        │ episodes │          │ alerts │             │   │
+        │  └────┬───┴────┬─────┴─────┬────┴───┬────┴────┬────────┘   │
+        └───────┼────────┼───────────┼────────┼─────────┼────────────┘
+                │        │           │        │         │
+           ┌────▼──┐  ┌──▼───┐  ┌───▼────┐ ┌─▼───┐  ┌─▼──────────┐
+           │Audit  │  │ ORM  │  │ Memory │ │Actn │  │Context     │
+           │Middle-│  │Models│  │ Engine │ │Logr │  │Broker      │
+           │ ware  │  │      │  │(short/ │ │     │  │(pub/sub    │
+           └───────┘  └──┬───┘  │long/   │ │     │  │→ SSE)      │
+                         │      │ decay/ │ │     │  │+ History   │
+                   ┌─────▼──┐   │episod.)│ └─────┘  └───┬────────┘
+                   │Postgres│◄──┘    │                   │
+                   │+pgvec  │        │            ┌──────▼──┐
+                   └────────┘   ┌────▼────┐       │  Redis  │
+                                │Portabil.│       │(pub/sub)│
+                                │export / │       └─────────┘
+                                │ import  │
+                                └─────────┘
 ```
 
 ## Components
@@ -113,29 +118,102 @@ Pure ASGI middleware that fires **after** authentication and **after** the respo
 
 `Agent` has three new fields: `status` (idle/working/error), `status_updated_at`, `current_session_id`. Status is cached in Redis (`agent_status:{id}`, TTL 60 s) for fast reads. Session lifecycle transitions update the status automatically.
 
+#### Agent tags (`agents/`)
+
+`tags TEXT[]` column on `agents` with a GIN index. `GET /v1/agents?tags=a,b` uses the `@>` (contains) operator. `GET /v1/agents/tags` returns `[{tag, count}]`. Tag mutations (`POST /{id}/tags`, `DELETE /{id}/tags/{tag}`) add/remove without overwriting the full array.
+
+#### Agent alerts (`actions/alerts.py`)
+
+After each action commit, `check_and_fire_alerts()` is called. Redis key `alert:{tenant}:{agent}:consecutive_errors` tracks consecutive failures (INCR on error, SET 0 on success). Fires `agent.alert` webhook when the count reaches `alert_on_consecutive_errors` (default 5). Also checks error rate over the last 20 actions against `alert_on_error_rate_percent` (default 80 %).
+
+#### Episodic memory (`core/memory/episodic.py`)
+
+Episodes group long-term memories under named task boundaries that may span multiple sessions.
+
+```
+Episode (title, status: active/completed/archived)
+  └── Session (episode_id FK, nullable)
+       └── Memories (linked via EpisodeMemory join table)
+```
+
+`EpisodicMemory.add_session_to_episode()` sets `Session.episode_id` and back-fills the `episode_memories` link table by finding all memories created within the session's time window. `complete_episode()` calls `claude-opus-4-8` to generate a narrative summary from all linked sessions and memories. `recall_episode()` scopes a pgvector cosine search to a single episode's memories.
+
+#### Agent hierarchy and relations (`core/agents/relations.py`)
+
+Three relation types, each directional:
+
+```
+supervisor ──► subordinate   (one per subordinate; no cycles)
+agentA ◄─────► agentB        (collaborator; bidirectional pair)
+delegator ───► delegate       (lightweight; many allowed)
+```
+
+Validation rules enforced in `AgentRelations.set_relation()`:
+- Self-relation → `SelfRelationError`
+- Cycle detection via BFS → `CycleError`
+- Multiple supervisors for the same agent → `DuplicateSupervisorError`
+
+**Blackboard propagation**: `PUT /v1/context/{ns}/{key}` with `propagate=true` and `written_by=agent_id` automatically writes the same key/value to every subordinate agent's namespace (their ID as namespace), after the main write commits.
+
+#### Context history (`context/blackboard.py`)
+
+Every `write()` and `delete()` appends an immutable `ContextHistory` row in the same transaction. Three read-only endpoints:
+- `GET /v1/context/{ns}/{key}/history` — cursor-paginated, newest first
+- `GET /v1/context/{ns}/{key}/history/{version}` — point-in-time value
+- `POST /v1/context/{ns}/{key}/rollback` — restore a prior version (creates a `rollback` history entry)
+
+Re-creating a deleted key continues the version sequence using `MAX(history.version) + 1`.
+
+#### Agent portability (`core/agents/portability.py`)
+
+Export/import as a self-contained JSON snapshot.
+
+**Export flow** (`GET /v1/agents/{id}/export`):
+1. `stream_export_agent()` yields the header, then each resource section using `db.stream_scalars()` server-side cursors (avoids loading all embeddings into memory).
+2. Actions are limited to the last 90 days.
+3. Embeddings are serialised as `[float(x) for x in mem.embedding]` — pgvector returns `numpy.float32` which is not JSON-serialisable directly.
+4. Returns a `StreamingResponse` with `Content-Disposition: attachment`.
+
+**Import flow** (`POST /v1/agents/import`):
+1. `AgentExportData` Pydantic model validates the payload (rejects unsupported `export_version`).
+2. `async with db.begin_nested()` creates a PostgreSQL savepoint — any failure rolls back cleanly without aborting the outer transaction.
+3. Insert order: Agent → Episodes → Sessions → Memories → Actions → EpisodeMemories.
+4. Returns an `id_map` (old UUID → new UUID) for every resource type.
+5. `asyncio.create_task(regenerate_embeddings_background(new_memory_ids))` re-embeds all memories in background using a separate `AsyncSessionLocal()` — the import response is returned immediately.
+
 ### Database (`crewlayer/db/`)
 
 Nine tables:
 
 ```
 tenants
-  └── api_keys         (FK → tenants; scopes text[]; agent_ids uuid[]; bcrypt hash)
-  └── agents           (status enum; status_updated_at; current_session_id)
-       └── sessions    (FK → agents; status enum; started_at/ended_at)
-       └── memories    (vector(1536); base_importance; merged_from uuid[];
-                        status enum active/archived; soft-delete via deleted_at)
-       └── actions     (immutable append-only)
-  └── context_entries  (unique on tenant+namespace+key)
-  └── webhooks         (url, events[], secret_hash)
-  └── audit_log        (immutable; tenant_id, api_key_id, method, path,
-                        status_code, request_body, response_body, created_at)
+  └── api_keys          (FK → tenants; scopes text[]; agent_ids uuid[]; bcrypt hash)
+  └── agents            (status enum; status_updated_at; current_session_id; tags text[])
+       └── sessions     (FK → agents; episode_id FK nullable; status enum; started_at/closed_at)
+       └── memories     (vector(1536); base_importance; merged_from uuid[];
+                         status enum active/archived; soft-delete via deleted_at)
+       └── actions      (immutable append-only)
+       └── episodes     (title; status enum active/completed/archived; summary; started_at/completed_at)
+  └── episode_memories  (composite PK: episode_id + memory_id; join table)
+  └── agent_relations   (supervisor_id, subordinate_id, relation_type enum; unique per pair)
+  └── context_entries   (unique on tenant+namespace+key; expires_at; written_by)
+  └── context_history   (immutable; namespace, key, value, version, operation enum, created_at)
+  └── webhooks          (url, events[], secret_hash)
+  └── audit_log         (immutable; tenant_id, api_key_id, method, path,
+                         status_code, request_body, response_body, created_at)
 ```
 
 All tables use `UUID` primary keys (`uuid4`). All timestamps are `TIMESTAMPTZ`.
 
-Migrations: Alembic with async engine (`NullPool` during migration to avoid pool leak). Current head: `b8c9d0e1f2a3`.
+Migrations: Alembic with async engine (`NullPool` during migration to avoid pool leak). Current head: `f2a3b4c5d6e7`.
 
-Key enum types: `agent_status_enum` (idle/working/error), `memory_status_enum` (active/archived), `session_status` (active/ended/expired).
+Key enum types:
+- `agent_status_enum` (idle/working/error)
+- `memory_status_enum` (active/archived)
+- `session_status` (active/closed)
+- `episode_status_enum` (active/completed/archived)
+- `agent_relation_type_enum` (supervisor/collaborator/delegate)
+- `context_operation_enum` (created/updated/deleted/rollback)
 
 ### Security
 
@@ -178,13 +256,30 @@ Six custom Gauges refreshed every 60 s:
 
 `docker-compose.observability.yml` adds Prometheus (scrapes `:8000/metrics`) and Grafana (`:3000`). The pre-built dashboard JSON lives at `observability/grafana/dashboards/crewlayer.json`.
 
-### SDK (`sdk/`)
+### SDKs
+
+#### Python SDK (`sdk/`)
 
 Installable as `pip install ./sdk`. Provides:
 - `CrewLayerClient` (sync) and `AsyncCrewLayerClient` (async) backed by `httpx`
-- Retry with exponential backoff (up to 4 attempts) on 5xx and transport errors
+- Retry with exponential backoff (3 retries, 1 s/2 s/4 s) on 5xx and transport errors
 - Typed exceptions: `AuthError`, `NotFoundError`, `ConflictError`, `RateLimitError`, `ServerError`
 - Typed response dataclasses mirroring the API schemas
+
+#### TypeScript SDK (`sdk-typescript/`)
+
+Installable as `npm install crewlayer` (or local `npm install ./sdk-typescript`). Provides:
+- `CrewLayerClient` with sub-clients: `memory`, `actions`, `context`, `agents`, `sessions`, `episodes`
+- Fetch-based transport — works in Node.js 18+ and modern browsers (no axios)
+- Same retry and error hierarchy as the Python SDK
+- `client.context.subscribe({ namespace, key })` → `ContextSSEStream` with `.on("updated" | "deleted" | "error" | "close", handler)` and `.close()`
+- Built with tsup → ESM (`dist/index.mjs`) + CJS (`dist/index.js`) + TypeScript declarations
+
+### CLI (`crewlayer/cli/`)
+
+Installable as `pip install crewlayer[cli]` (typer + rich). Entry point: `crewlayer.cli.main:app`. Config stored at `~/.crewlayer/config.json` (chmod 0o600).
+
+Sub-commands: `init`, `config`, `tenants create`, `keys create/list`, `agents list/create/status`, `memory recall/list`, `actions list/stats`, `export`, `import`. Every list/detail command supports `--json` for pipeline use (pipes into `jq`, CI scripts, etc.).
 
 ## Data flow: memory recall
 

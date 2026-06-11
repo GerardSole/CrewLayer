@@ -24,20 +24,41 @@ API docs: http://localhost:8000/docs
 | **Memory deduplication** | Near-duplicates (cosine ≥ 0.90) are auto-merged by Claude; full lineage via `GET .../history` |
 | **Automatic forgetting** | Three-rule decay system: hard-delete stale low-importance, archive cold memories, decay unaccessed ones |
 | **Memory extraction** | `claude-opus-4-8` extracts facts from conversations and persists them as memories |
+| **Episodic memory** | Group sessions and memories under named task episodes; Claude generates episode summaries |
 | **Action log** | Immutable, append-only record of every tool call with cursor pagination and aggregate stats |
-| **Shared blackboard** | Namespace-scoped key/value store with optimistic locking and real-time SSE subscriptions |
+| **Agent alerts** | Configurable webhooks fired on consecutive errors or high error-rate thresholds |
+| **Shared blackboard** | Namespace-scoped key/value store with optimistic locking, TTL expiry, and real-time SSE subscriptions |
+| **Context history** | Immutable write log per key; point-in-time reads and one-click rollback |
 | **Agent status** | idle/working/error lifecycle, Redis-cached, auto-transitions on session open/close |
-| **Sessions** | Tracks agent conversations with start/end timestamps and status |
-| **Webhooks** | Register HTTP endpoints to receive event notifications (memory.extracted, etc.) |
+| **Agent tags** | Arbitrary tags with GIN index; filter agents by tag with AND semantics |
+| **Agent hierarchy** | supervisor/collaborator/delegate relations with cycle detection and blackboard propagation |
+| **Agent portability** | Full JSON export/import — carry an agent across tenants or environments |
+| **Sessions** | Tracks agent conversations with start/end timestamps and optional episode assignment |
+| **Webhooks** | Register HTTP endpoints to receive event notifications (memory.extracted, agent.alert, etc.) |
 | **Audit log** | Immutable record of every mutating API call, cursor-paginated |
 | **Granular API keys** | Per-key scope restrictions (`memory:read`, `actions:write`, …) and agent-level restrictions |
 | **MCP server** | Native integration with Claude Desktop and Claude Code via 9 MCP tools |
 | **Prometheus metrics** | Auto HTTP metrics + 6 custom Gauges; Grafana dashboard included |
+| **Python SDK** | Sync + async client backed by httpx; typed exceptions; retry with backoff |
+| **TypeScript SDK** | Fetch-based client for Node.js 18+ and browsers; same types as the REST API |
+| **CLI** | `crewlayer` command — manage agents, memory, actions, and portability from the terminal |
 | **Multi-tenant** | Every resource is scoped to a tenant; isolation enforced at query level |
 
 ---
 
 ## Quickstart
+
+### Option A — CLI (recommended)
+
+```bash
+pip install crewlayer[cli]
+crewlayer init               # wizard: enter URL + API key
+crewlayer tenants create --name "my-project"   # prints bootstrap key
+crewlayer agents create --name "research-agent"
+crewlayer memory recall <agent_id> "user preferences"
+```
+
+### Option B — curl
 
 ### 1. Create a tenant
 
@@ -109,7 +130,9 @@ curl http://localhost:8000/v1/context/shared/system_prompt \
 
 ---
 
-## Python SDK
+## SDKs
+
+### Python
 
 ```bash
 pip install ./sdk
@@ -120,11 +143,12 @@ from crewlayer import CrewLayerClient
 
 client = CrewLayerClient(api_key="crwl_...")
 
-# Store a memory
-client.memory.save(agent_id="...", content="User prefers Python")
+# Append to session history and extract long-term memories
+client.memory.append(agent_id="...", session_id="...", role="user", content="User prefers Python")
+client.memory.extract(agent_id="...", session_id="...")
 
-# Recall by semantic similarity
-results = client.memory.recall(agent_id="...", query="language preference")
+# Semantic recall
+results = client.memory.recall(agent_id="...", query="language preference", limit=5)
 
 # Log an action
 client.actions.log(
@@ -134,6 +158,49 @@ client.actions.log(
     output_result={"status": "sent"},
     status="success",
 )
+```
+
+### TypeScript / JavaScript
+
+```bash
+npm install crewlayer
+# or from source:
+npm install ./sdk-typescript
+```
+
+```typescript
+import { CrewLayerClient } from "crewlayer";
+
+const client = new CrewLayerClient({ apiKey: "crwl_..." });
+
+// Append to session history
+await client.memory.append({
+  agentId: "...",
+  sessionId: "...",
+  role: "user",
+  content: "User prefers Python",
+});
+
+// Semantic recall
+const { results } = await client.memory.recall({
+  agentId: "...",
+  query: "language preference",
+  limit: 5,
+});
+
+// Log an action
+await client.actions.log({
+  agentId: "...",
+  toolName: "send_email",
+  inputParams: { to: "user@example.com" },
+  outputResult: { status: "sent" },
+  status: "success",
+});
+
+// Subscribe to real-time context updates
+const stream = client.context.subscribe({ namespace: "project:xyz", key: "status" });
+stream.on("updated", (entry) => console.log(entry.value));
+stream.close(); // when done
 ```
 
 ---
@@ -154,11 +221,23 @@ client.actions.log(
 | Method | Path | Description |
 |---|---|---|
 | `POST` | `/v1/agents` | Create agent |
-| `GET` | `/v1/agents` | List agents (filter by `?status=`) |
+| `GET` | `/v1/agents` | List agents (filter by `?status=`, `?tags=`) |
 | `GET` | `/v1/agents/{id}` | Get agent |
+| `PATCH` | `/v1/agents/{id}` | Update agent |
 | `DELETE` | `/v1/agents/{id}` | Delete agent |
 | `GET` | `/v1/agents/{id}/status` | Get status (Redis-cached) |
 | `PATCH` | `/v1/agents/{id}/status` | Set status (idle/working/error) |
+| `GET` | `/v1/agents/tags` | List all tags with usage counts |
+| `POST` | `/v1/agents/{id}/tags` | Add tags |
+| `DELETE` | `/v1/agents/{id}/tags/{tag}` | Remove a tag |
+| `GET` | `/v1/agents/{id}/alerts/config` | Get alert thresholds |
+| `PATCH` | `/v1/agents/{id}/alerts/config` | Update alert thresholds |
+| `POST` | `/v1/agents/{id}/relations` | Set a relation to another agent |
+| `GET` | `/v1/agents/{id}/relations` | List all relations |
+| `GET` | `/v1/agents/{id}/tree` | Hierarchical relation tree |
+| `DELETE` | `/v1/agents/{id}/relations/{other_id}` | Remove a relation |
+| `GET` | `/v1/agents/{id}/export` | Export agent snapshot (StreamingResponse) |
+| `POST` | `/v1/agents/import` | Import a snapshot; returns new agent + id_map |
 
 ### Memory
 
@@ -188,20 +267,33 @@ client.actions.log(
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/v1/agents/{id}/sessions` | Start a session |
-| `GET` | `/v1/agents/{id}/sessions` | List sessions |
-| `GET` | `/v1/agents/{id}/sessions/{session_id}` | Get session |
-| `POST` | `/v1/agents/{id}/sessions/{session_id}/end` | End a session |
+| `POST` | `/v1/sessions` | Start a session |
+| `GET` | `/v1/sessions/{id}` | Get session |
+| `POST` | `/v1/sessions/{id}/close` | Close a session |
+| `PATCH` | `/v1/sessions/{id}` | Update session (e.g. assign episode) |
+
+### Episodes
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/v1/agents/{id}/episodes` | Create an episode |
+| `GET` | `/v1/agents/{id}/episodes` | List episodes (filter by `?status=`) |
+| `GET` | `/v1/agents/{id}/episodes/{ep_id}` | Episode detail (with sessions + memories) |
+| `POST` | `/v1/agents/{id}/episodes/{ep_id}/complete` | Complete episode; generates Claude summary |
+| `POST` | `/v1/agents/{id}/episodes/{ep_id}/recall` | Semantic recall scoped to this episode |
 
 ### Context (Blackboard)
 
 | Method | Path | Description |
 |---|---|---|
-| `PUT` | `/v1/context/{namespace}/{key}` | Write (optimistic locking optional) |
+| `PUT` | `/v1/context/{namespace}/{key}` | Write (optimistic locking, TTL, propagation optional) |
 | `GET` | `/v1/context/{namespace}/{key}` | Read |
 | `GET` | `/v1/context/{namespace}` | List namespace |
 | `DELETE` | `/v1/context/{namespace}/{key}` | Delete |
 | `GET` | `/v1/context/{namespace}/{key}/subscribe` | SSE stream — real-time updates |
+| `GET` | `/v1/context/{namespace}/{key}/history` | Immutable write history (cursor-paginated) |
+| `GET` | `/v1/context/{namespace}/{key}/history/{version}` | Point-in-time value |
+| `POST` | `/v1/context/{namespace}/{key}/rollback` | Restore a previous version |
 
 ### Webhooks
 
@@ -409,7 +501,7 @@ pip install -e ".[dev]"
 pytest tests/ -v
 ```
 
-284 tests run against a real PostgreSQL and Redis instance (no mocks for infrastructure). CLI tests use httpx mocks and require no running server.
+316 Python tests run against a real PostgreSQL and Redis instance (no mocks for infrastructure). CLI tests use httpx mocks and require no running server. TypeScript SDK: 72 tests with vitest (fetch mocked, no server needed).
 
 ---
 
