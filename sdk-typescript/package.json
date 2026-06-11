@@ -15,6 +15,24 @@
         "types": "./dist/index.d.cts",
         "default": "./dist/index.cjs"
       }
+    },
+    "./integrations/vercel-ai": {
+      "import": {
+        "types": "./dist/integrations/vercel-ai.d.ts",
+        "default": "./dist/integrations/vercel-ai.js"
+      },
+      "require": {
+        "types": "./dist/integrations/vercel-ai.d.cts",
+        "default": "./dist/integrations/vercel-ai.cjs"
+      }
+    }
+  },
+  "peerDependencies": {
+    "ai": ">=3.0.0"
+  },
+  "peerDependenciesMeta": {
+    "ai": {
+      "optional": true
     }
   },
   "files": [

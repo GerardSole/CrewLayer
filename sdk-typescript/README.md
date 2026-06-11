@@ -349,6 +349,133 @@ dist/
 └── *.map         # Source maps
 ```
 
+## Integrations
+
+### Vercel AI SDK / Next.js
+
+```bash
+npm install crewlayer ai @ai-sdk/anthropic
+```
+
+Three adapters available from `crewlayer/integrations/vercel-ai`:
+
+| Export | What it does |
+|---|---|
+| `crewLayerMemory()` | Memory provider — prepends recalled memories before LLM calls, persists messages after |
+| `crewLayerTools()` | Four LLM-callable tools: `recall_memory`, `log_action`, `read_context`, `write_context` |
+| `CrewLayerDataStream` | Wraps `result.textStream`, auto-logs the completed response as a CrewLayer action |
+
+**Full route handler example:**
+
+```typescript
+// app/api/chat/route.ts
+import { streamText } from "ai";
+import { anthropic } from "@ai-sdk/anthropic";
+import { CrewLayerClient } from "crewlayer";
+import {
+  crewLayerMemory,
+  crewLayerTools,
+  CrewLayerDataStream,
+} from "crewlayer/integrations/vercel-ai";
+
+const client = new CrewLayerClient({ apiKey: process.env.CREWLAYER_API_KEY! });
+const AGENT_ID = process.env.CREWLAYER_AGENT_ID!;
+
+const memory = crewLayerMemory({ client, agentId: AGENT_ID, memoryLimit: 8 });
+const tools  = crewLayerTools({ client, agentId: AGENT_ID });
+
+export async function POST(req: Request) {
+  const { messages, sessionId = "default" } = await req.json();
+
+  // 1. Prepend relevant long-term memories as a system message
+  const contextMessages = await memory.get(messages);
+
+  // 2. Stream the LLM response with CrewLayer tools available
+  const result = streamText({
+    model: anthropic("claude-opus-4-8"),
+    messages: [...contextMessages, ...messages],
+    tools: {
+      recall_memory: tools.recall_memory,
+      write_context:  tools.write_context,
+    },
+  });
+
+  // 3. Persist the conversation to short-term memory (non-blocking)
+  void memory.update({ messages });
+
+  // 4. Wrap the text stream — logs the completed response as an action
+  return new CrewLayerDataStream(result.textStream, {
+    client,
+    agentId: AGENT_ID,
+    sessionId,
+  }).toResponse();
+}
+```
+
+**Memory-only usage** (no tools, no streaming wrapper):
+
+```typescript
+const memory = crewLayerMemory({ client, agentId: "agent-001", sessionId: "sess-001" });
+
+// Before the LLM call — returns [] if no relevant memories
+const context = await memory.get(messages);
+
+// After the LLM call — persists new messages
+await memory.update({ messages: [...messages, assistantReply] });
+
+// Fetch raw session history as CoreMessage[]
+const history = await memory.getMessages();
+
+// Save a batch of messages explicitly
+await memory.saveMessages({ messages, sessionId: "sess-002" });
+```
+
+**Tools without streaming:**
+
+```typescript
+import { generateText, jsonSchema } from "ai";
+import { crewLayerTools } from "crewlayer/integrations/vercel-ai";
+
+const tools = crewLayerTools({ client, agentId: "agent-001" });
+
+// Tools use plain JSON Schema — wrap with jsonSchema() if needed by your SDK version
+const result = await generateText({
+  model: anthropic("claude-opus-4-8"),
+  messages,
+  tools: {
+    recall_memory: {
+      ...tools.recall_memory,
+      parameters: jsonSchema(tools.recall_memory.parameters),
+    },
+    read_context: {
+      ...tools.read_context,
+      parameters: jsonSchema(tools.read_context.parameters),
+    },
+  },
+});
+```
+
+**Manual stream logging:**
+
+```typescript
+import { CrewLayerDataStream } from "crewlayer/integrations/vercel-ai";
+
+const stream = new CrewLayerDataStream(result.textStream, {
+  client,
+  agentId: "agent-001",
+  sessionId: "sess-001",
+  toolName: "chat.completion",   // custom action name (default: "vercel.stream")
+});
+
+// Consume directly (logs on completion)
+for await (const chunk of stream) {
+  process.stdout.write(chunk);
+}
+
+// Or return as a Next.js streaming response
+return stream.toResponse({ status: 200 });
+```
+
 ## Development
 
 ```bash
