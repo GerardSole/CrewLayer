@@ -2,9 +2,9 @@
 
 Provides three adapters:
 
-- ``AgentLayerMemory``       — BaseChatMemory backed by CrewLayer short-term memory
-- ``AgentLayerVectorStore``  — VectorStore backed by CrewLayer semantic recall
-- ``AgentLayerCallbackHandler`` — logs every tool call as a CrewLayer action
+- ``CrewLayerMemory``          — BaseChatMemory backed by CrewLayer short-term memory
+- ``CrewLayerVectorStore``     — VectorStore backed by CrewLayer semantic recall
+- ``CrewLayerCallbackHandler`` — logs every tool call as a CrewLayer action
 
 Install::
 
@@ -14,18 +14,18 @@ Usage::
 
     from crewlayer import CrewLayerClient
     from crewlayer.integrations.langchain import (
-        AgentLayerMemory,
-        AgentLayerVectorStore,
-        AgentLayerCallbackHandler,
+        CrewLayerMemory,
+        CrewLayerVectorStore,
+        CrewLayerCallbackHandler,
     )
 
     client = CrewLayerClient(api_key="crwl_...")
 
-    memory = AgentLayerMemory(client=client, agent_id="agent-uuid")
-    handler = AgentLayerCallbackHandler(client=client, agent_id="agent-uuid")
+    memory = CrewLayerMemory(client=client, agent_id="agent-uuid")
+    handler = CrewLayerCallbackHandler(client=client, agent_id="agent-uuid")
     chain = ConversationChain(llm=llm, memory=memory, callbacks=[handler])
 
-    store = AgentLayerVectorStore(client=client, agent_id="agent-uuid")
+    store = CrewLayerVectorStore(client=client, agent_id="agent-uuid")
     docs = store.similarity_search("user preferences", k=5)
 """
 from __future__ import annotations
@@ -71,11 +71,11 @@ except ImportError:
 
 
 # ---------------------------------------------------------------------------
-# AgentLayerMemory
+# CrewLayerMemory
 # ---------------------------------------------------------------------------
 
 
-class AgentLayerMemory(_LCBaseMemory):  # type: ignore[misc]
+class CrewLayerMemory(_LCBaseMemory):  # type: ignore[misc]
     """LangChain ``BaseMemory`` implementation backed by CrewLayer short-term memory.
 
     Messages are stored in CrewLayer's Redis-backed session store and
@@ -168,11 +168,11 @@ class AgentLayerMemory(_LCBaseMemory):  # type: ignore[misc]
 
 
 # ---------------------------------------------------------------------------
-# AgentLayerVectorStore
+# CrewLayerVectorStore
 # ---------------------------------------------------------------------------
 
 
-class AgentLayerVectorStore(_LCVectorStore):  # type: ignore[misc]
+class CrewLayerVectorStore(_LCVectorStore):  # type: ignore[misc]
     """LangChain ``VectorStore`` backed by CrewLayer's pgvector semantic recall.
 
     ``similarity_search`` maps directly to ``client.memory.recall`` — queries
@@ -265,7 +265,7 @@ class AgentLayerVectorStore(_LCVectorStore):  # type: ignore[misc]
         client: Any,
         agent_id: str,
         **kwargs: Any,
-    ) -> "AgentLayerVectorStore":
+    ) -> "CrewLayerVectorStore":
         """Factory: create a store, add *texts*, and return the instance."""
         store = cls(client=client, agent_id=agent_id, **kwargs)
         store.add_texts(texts, metadatas=metadatas)
@@ -285,11 +285,11 @@ def _to_document(item: Any) -> Any:
 
 
 # ---------------------------------------------------------------------------
-# AgentLayerCallbackHandler
+# CrewLayerCallbackHandler
 # ---------------------------------------------------------------------------
 
 
-class AgentLayerCallbackHandler(_LCCallbackHandler):  # type: ignore[misc]
+class CrewLayerCallbackHandler(_LCCallbackHandler):  # type: ignore[misc]
     """LangChain ``BaseCallbackHandler`` that logs tool calls to CrewLayer actions.
 
     Attach to any chain or agent executor to automatically record every tool
@@ -303,7 +303,7 @@ class AgentLayerCallbackHandler(_LCCallbackHandler):  # type: ignore[misc]
 
     Usage::
 
-        handler = AgentLayerCallbackHandler(client=client, agent_id="agent-uuid")
+        handler = CrewLayerCallbackHandler(client=client, agent_id="agent-uuid")
         agent_executor.invoke({"input": "..."}, config={"callbacks": [handler]})
     """
 

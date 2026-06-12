@@ -74,8 +74,8 @@ Each integration falls back gracefully when the framework is not installed.
 
 | Extra | Install | What you get |
 |---|---|---|
-| `langchain` | `pip install crewlayer[langchain]` | `AgentLayerMemory`, `AgentLayerVectorStore`, `AgentLayerCallbackHandler` |
-| `crewai` | `pip install crewlayer[crewai]` | `AgentLayerMemoryProvider`, `AgentLayerTaskLogger` |
+| `langchain` | `pip install crewlayer[langchain]` | `CrewLayerMemory`, `CrewLayerVectorStore`, `CrewLayerCallbackHandler` |
+| `crewai` | `pip install crewlayer[crewai]` | `CrewLayerMemoryProvider`, `CrewLayerTaskLogger` |
 | `llamaindex` | `pip install crewlayer[llamaindex]` | `CrewLayerMemoryBuffer`, `CrewLayerVectorIndex`, `CrewLayerQueryEngine`, `CrewLayerCallbackManager` |
 | `autogen` | `pip install crewlayer[autogen]` | `CrewLayerConversableAgent`, `CrewLayerGroupChatManager`, `CrewLayerAgentMemory`, `sync_agent_status` |
 | `all-integrations` | `pip install crewlayer[all-integrations]` | All of the above |
@@ -84,12 +84,12 @@ Each integration falls back gracefully when the framework is not installed.
 
 ```python
 from crewlayer import CrewLayerClient
-from crewlayer.integrations.langchain import AgentLayerMemory
+from crewlayer.integrations.langchain import CrewLayerMemory
 from langchain.chains import ConversationChain
 from langchain_openai import ChatOpenAI
 
 client = CrewLayerClient(api_key="crwl_...")
-memory = AgentLayerMemory(client=client, agent_id="agent-uuid", session_id="user-123")
+memory = CrewLayerMemory(client=client, agent_id="agent-uuid", session_id="user-123")
 chain = ConversationChain(llm=ChatOpenAI(), memory=memory)
 chain.predict(input="What's my name?")
 ```
@@ -97,14 +97,14 @@ chain.predict(input="What's my name?")
 ### CrewAI
 
 ```python
-from crewlayer.integrations.crewai import AgentLayerMemoryProvider, AgentLayerTaskLogger
+from crewlayer.integrations.crewai import CrewLayerMemoryProvider, CrewLayerTaskLogger
 from crewai.memory import LongTermMemory
 from crewai import Task
 
-storage = AgentLayerMemoryProvider(client=client, agent_id="agent-uuid")
+storage = CrewLayerMemoryProvider(client=client, agent_id="agent-uuid")
 ltm = LongTermMemory(storage=storage)
 
-logger = AgentLayerTaskLogger(client=client, agent_id="agent-uuid")
+logger = CrewLayerTaskLogger(client=client, agent_id="agent-uuid")
 task = Task(description="Summarize feedback", expected_output="...", agent=agent, callback=logger)
 ```
 

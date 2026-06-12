@@ -2,8 +2,8 @@
 
 Provides two adapters:
 
-- ``AgentLayerMemoryProvider`` — CrewAI ``Storage``-compatible memory backed by CrewLayer
-- ``AgentLayerTaskLogger``     — task callback that logs each task completion as a CrewLayer action
+- ``CrewLayerMemoryProvider`` — CrewAI ``Storage``-compatible memory backed by CrewLayer
+- ``CrewLayerTaskLogger``     — task callback that logs each task completion as a CrewLayer action
 
 Install::
 
@@ -13,15 +13,15 @@ Usage::
 
     from crewlayer import CrewLayerClient
     from crewlayer.integrations.crewai import (
-        AgentLayerMemoryProvider,
-        AgentLayerTaskLogger,
+        CrewLayerMemoryProvider,
+        CrewLayerTaskLogger,
     )
     from crewai import Agent, Task, Crew
 
     client = CrewLayerClient(api_key="crwl_...")
 
-    memory_provider = AgentLayerMemoryProvider(client=client, agent_id="agent-uuid")
-    task_logger = AgentLayerTaskLogger(client=client, agent_id="agent-uuid")
+    memory_provider = CrewLayerMemoryProvider(client=client, agent_id="agent-uuid")
+    task_logger = CrewLayerTaskLogger(client=client, agent_id="agent-uuid")
 
     task = Task(description="Analyze sales data", callback=task_logger)
     crew = Crew(agents=[...], tasks=[task], memory=True)
@@ -47,11 +47,11 @@ except ImportError:
 
 
 # ---------------------------------------------------------------------------
-# AgentLayerMemoryProvider
+# CrewLayerMemoryProvider
 # ---------------------------------------------------------------------------
 
 
-class AgentLayerMemoryProvider(_CrewAIStorage):  # type: ignore[misc]
+class CrewLayerMemoryProvider(_CrewAIStorage):  # type: ignore[misc]
     """CrewAI-compatible ``Storage`` provider backed by CrewLayer.
 
     Implements the minimal CrewAI storage interface (``save`` / ``search`` /
@@ -70,10 +70,10 @@ class AgentLayerMemoryProvider(_CrewAIStorage):  # type: ignore[misc]
     Example::
 
         from crewai.memory import LongTermMemory
-        from crewlayer.integrations.crewai import AgentLayerMemoryProvider
+        from crewlayer.integrations.crewai import CrewLayerMemoryProvider
 
         ltm = LongTermMemory(
-            storage=AgentLayerMemoryProvider(client=client, agent_id="abc")
+            storage=CrewLayerMemoryProvider(client=client, agent_id="abc")
         )
     """
 
@@ -152,11 +152,11 @@ class AgentLayerMemoryProvider(_CrewAIStorage):  # type: ignore[misc]
 
 
 # ---------------------------------------------------------------------------
-# AgentLayerTaskLogger
+# CrewLayerTaskLogger
 # ---------------------------------------------------------------------------
 
 
-class AgentLayerTaskLogger:
+class CrewLayerTaskLogger:
     """Callable CrewAI task callback that logs completions as CrewLayer actions.
 
     Pass an instance as ``callback=`` on any CrewAI ``Task``.  Each time the
@@ -171,7 +171,7 @@ class AgentLayerTaskLogger:
 
     Example::
 
-        logger = AgentLayerTaskLogger(client=client, agent_id="agent-uuid")
+        logger = CrewLayerTaskLogger(client=client, agent_id="agent-uuid")
         task = Task(description="Summarize customer feedback", callback=logger)
     """
 

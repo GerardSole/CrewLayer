@@ -11,9 +11,9 @@ from unittest.mock import MagicMock, call, patch
 import pytest
 
 from crewlayer.integrations.langchain import (
-    AgentLayerCallbackHandler,
-    AgentLayerMemory,
-    AgentLayerVectorStore,
+    CrewLayerCallbackHandler,
+    CrewLayerMemory,
+    CrewLayerVectorStore,
 )
 
 
@@ -66,20 +66,20 @@ def _recall_item(
 
 
 # ---------------------------------------------------------------------------
-# AgentLayerMemory
+# CrewLayerMemory
 # ---------------------------------------------------------------------------
 
 
-class TestAgentLayerMemory:
+class TestCrewLayerMemory:
     def test_memory_variables_contains_key(self) -> None:
-        mem = AgentLayerMemory(client=_make_client(), agent_id="a1", memory_key="chat_history")
+        mem = CrewLayerMemory(client=_make_client(), agent_id="a1", memory_key="chat_history")
         assert mem.memory_variables == ["chat_history"]
 
     def test_load_returns_human_ai_messages(self) -> None:
         client = _make_client(
             messages=[_msg("user", "Hi"), _msg("assistant", "Hello!")]
         )
-        mem = AgentLayerMemory(client=client, agent_id="a1")
+        mem = CrewLayerMemory(client=client, agent_id="a1")
         result = mem.load_memory_variables({})
         msgs = result["history"]
         assert len(msgs) == 2
@@ -91,7 +91,7 @@ class TestAgentLayerMemory:
         client = _make_client(
             messages=[_msg("human", "Hello"), _msg("user", "World")]
         )
-        mem = AgentLayerMemory(client=client, agent_id="a1", return_messages=True)
+        mem = CrewLayerMemory(client=client, agent_id="a1", return_messages=True)
         msgs = mem.load_memory_variables({})["history"]
         from crewlayer.integrations.langchain import HumanMessage
         for m in msgs:
@@ -101,19 +101,19 @@ class TestAgentLayerMemory:
         client = _make_client(
             messages=[_msg("user", "Hi"), _msg("assistant", "Hello!")]
         )
-        mem = AgentLayerMemory(client=client, agent_id="a1", return_messages=False)
+        mem = CrewLayerMemory(client=client, agent_id="a1", return_messages=False)
         result = mem.load_memory_variables({})["history"]
         assert "user: Hi" in result
         assert "assistant: Hello!" in result
 
     def test_load_empty_session(self) -> None:
         client = _make_client(messages=[])
-        mem = AgentLayerMemory(client=client, agent_id="a1")
+        mem = CrewLayerMemory(client=client, agent_id="a1")
         assert mem.load_memory_variables({})["history"] == []
 
     def test_save_context_appends_both_turns(self) -> None:
         client = _make_client()
-        mem = AgentLayerMemory(client=client, agent_id="a1", session_id="s1")
+        mem = CrewLayerMemory(client=client, agent_id="a1", session_id="s1")
         mem.save_context({"input": "Hi"}, {"output": "Hello!"})
 
         assert client.memory.append.call_count == 2
@@ -123,7 +123,7 @@ class TestAgentLayerMemory:
 
     def test_save_context_custom_keys(self) -> None:
         client = _make_client()
-        mem = AgentLayerMemory(
+        mem = CrewLayerMemory(
             client=client, agent_id="a1", input_key="question", output_key="answer"
         )
         mem.save_context({"question": "2+2?", "other": "x"}, {"answer": "4"})
@@ -134,31 +134,31 @@ class TestAgentLayerMemory:
     def test_save_context_missing_output_key(self) -> None:
         """When output dict is empty, only the input turn is saved."""
         client = _make_client()
-        mem = AgentLayerMemory(client=client, agent_id="a1")
+        mem = CrewLayerMemory(client=client, agent_id="a1")
         mem.save_context({"input": "Hi"}, {})
         assert client.memory.append.call_count == 1
 
     def test_clear_is_noop(self) -> None:
-        mem = AgentLayerMemory(client=_make_client(), agent_id="a1")
+        mem = CrewLayerMemory(client=_make_client(), agent_id="a1")
         mem.clear()  # must not raise
 
     def test_messages_called_with_session_id(self) -> None:
         client = _make_client()
-        mem = AgentLayerMemory(client=client, agent_id="a1", session_id="xyz")
+        mem = CrewLayerMemory(client=client, agent_id="a1", session_id="xyz")
         mem.load_memory_variables({})
         client.memory.messages.assert_called_once_with("a1", session_id="xyz")
 
 
 # ---------------------------------------------------------------------------
-# AgentLayerVectorStore
+# CrewLayerVectorStore
 # ---------------------------------------------------------------------------
 
 
-class TestAgentLayerVectorStore:
+class TestCrewLayerVectorStore:
     def test_similarity_search_returns_documents(self) -> None:
         items = [_recall_item("Python dev", 0.95), _recall_item("dark mode", 0.80)]
         client = _make_client(recall_results=items)
-        store = AgentLayerVectorStore(client=client, agent_id="a1")
+        store = CrewLayerVectorStore(client=client, agent_id="a1")
         docs = store.similarity_search("preferences")
         assert len(docs) == 2
         assert docs[0].page_content == "Python dev"
@@ -166,20 +166,20 @@ class TestAgentLayerVectorStore:
 
     def test_similarity_search_uses_k_param(self) -> None:
         client = _make_client(recall_results=[])
-        store = AgentLayerVectorStore(client=client, agent_id="a1", k=4)
+        store = CrewLayerVectorStore(client=client, agent_id="a1", k=4)
         store.similarity_search("q", k=7)
         client.memory.recall.assert_called_once_with("a1", "q", limit=7, min_similarity=0.0)
 
     def test_similarity_search_uses_default_k(self) -> None:
         client = _make_client(recall_results=[])
-        store = AgentLayerVectorStore(client=client, agent_id="a1", k=3)
+        store = CrewLayerVectorStore(client=client, agent_id="a1", k=3)
         store.similarity_search("q")
         client.memory.recall.assert_called_once_with("a1", "q", limit=3, min_similarity=0.0)
 
     def test_similarity_search_with_score(self) -> None:
         items = [_recall_item("content", 0.88)]
         client = _make_client(recall_results=items)
-        store = AgentLayerVectorStore(client=client, agent_id="a1")
+        store = CrewLayerVectorStore(client=client, agent_id="a1")
         results = store.similarity_search_with_score("q")
         assert len(results) == 1
         doc, score = results[0]
@@ -189,39 +189,39 @@ class TestAgentLayerVectorStore:
     def test_similarity_search_with_score_null_similarity(self) -> None:
         item = _recall_item("x", similarity=None)
         client = _make_client(recall_results=[item])
-        store = AgentLayerVectorStore(client=client, agent_id="a1")
+        store = CrewLayerVectorStore(client=client, agent_id="a1")
         _, score = store.similarity_search_with_score("q")[0]
         assert score == 0.0
 
     def test_add_texts_calls_extract_per_text(self) -> None:
         client = _make_client(extract_ids=["id-1"])
-        store = AgentLayerVectorStore(client=client, agent_id="a1")
+        store = CrewLayerVectorStore(client=client, agent_id="a1")
         ids = store.add_texts(["text A", "text B"])
         assert client.memory.extract.call_count == 2
         assert len(ids) == 2
 
     def test_add_texts_embeds_prompt_prefix(self) -> None:
         client = _make_client()
-        store = AgentLayerVectorStore(client=client, agent_id="a1")
+        store = CrewLayerVectorStore(client=client, agent_id="a1")
         store.add_texts(["hello world"])
         call_kwargs = client.memory.extract.call_args
         assert "hello world" in call_kwargs[1]["conversation"]
 
     def test_from_texts_factory(self) -> None:
         client = _make_client(extract_ids=["m1"])
-        store = AgentLayerVectorStore.from_texts(
+        store = CrewLayerVectorStore.from_texts(
             ["fact one", "fact two"],
             embedding=None,
             client=client,
             agent_id="a1",
         )
-        assert isinstance(store, AgentLayerVectorStore)
+        assert isinstance(store, CrewLayerVectorStore)
         assert client.memory.extract.call_count == 2
 
     def test_metadata_fields_present(self) -> None:
         item = _recall_item("content", tags=["python"], importance=0.9)
         client = _make_client(recall_results=[item])
-        store = AgentLayerVectorStore(client=client, agent_id="a1")
+        store = CrewLayerVectorStore(client=client, agent_id="a1")
         doc = store.similarity_search("q")[0]
         assert doc.metadata["tags"] == ["python"]
         assert doc.metadata["importance"] == 0.9
@@ -229,17 +229,17 @@ class TestAgentLayerVectorStore:
 
 
 # ---------------------------------------------------------------------------
-# AgentLayerCallbackHandler
+# CrewLayerCallbackHandler
 # ---------------------------------------------------------------------------
 
 
-class TestAgentLayerCallbackHandler:
+class TestCrewLayerCallbackHandler:
     def _run_id(self) -> uuid.UUID:
         return uuid.uuid4()
 
     def test_on_tool_end_logs_success(self) -> None:
         client = _make_client()
-        handler = AgentLayerCallbackHandler(client=client, agent_id="a1")
+        handler = CrewLayerCallbackHandler(client=client, agent_id="a1")
         rid = self._run_id()
         handler.on_tool_start({"name": "search"}, "query text", run_id=rid)
         handler.on_tool_end("result text", run_id=rid)
@@ -253,7 +253,7 @@ class TestAgentLayerCallbackHandler:
 
     def test_on_tool_error_logs_error_status(self) -> None:
         client = _make_client()
-        handler = AgentLayerCallbackHandler(client=client, agent_id="a1")
+        handler = CrewLayerCallbackHandler(client=client, agent_id="a1")
         rid = self._run_id()
         handler.on_tool_start({"name": "calculator"}, "1+1", run_id=rid)
         handler.on_tool_error(ValueError("oops"), run_id=rid)
@@ -265,7 +265,7 @@ class TestAgentLayerCallbackHandler:
 
     def test_duration_ms_is_positive_integer(self) -> None:
         client = _make_client()
-        handler = AgentLayerCallbackHandler(client=client, agent_id="a1")
+        handler = CrewLayerCallbackHandler(client=client, agent_id="a1")
         rid = self._run_id()
         handler.on_tool_start({"name": "t"}, "x", run_id=rid)
         handler.on_tool_end("y", run_id=rid)
@@ -276,7 +276,7 @@ class TestAgentLayerCallbackHandler:
 
     def test_session_id_forwarded(self) -> None:
         client = _make_client()
-        handler = AgentLayerCallbackHandler(client=client, agent_id="a1", session_id="sess-1")
+        handler = CrewLayerCallbackHandler(client=client, agent_id="a1", session_id="sess-1")
         rid = self._run_id()
         handler.on_tool_start({}, "x", run_id=rid)
         handler.on_tool_end("y", run_id=rid)
@@ -287,20 +287,20 @@ class TestAgentLayerCallbackHandler:
     def test_on_tool_end_without_prior_start(self) -> None:
         """on_tool_end with unknown run_id should still log (gracefully)."""
         client = _make_client()
-        handler = AgentLayerCallbackHandler(client=client, agent_id="a1")
+        handler = CrewLayerCallbackHandler(client=client, agent_id="a1")
         handler.on_tool_end("result", run_id=uuid.uuid4())
         assert client.actions.log.called
 
     def test_on_tool_error_without_prior_start(self) -> None:
         client = _make_client()
-        handler = AgentLayerCallbackHandler(client=client, agent_id="a1")
+        handler = CrewLayerCallbackHandler(client=client, agent_id="a1")
         handler.on_tool_error(RuntimeError("fail"), run_id=uuid.uuid4())
         assert client.actions.log.called
 
     def test_multiple_parallel_tools(self) -> None:
         """Two concurrent tool runs with different run_ids log independently."""
         client = _make_client()
-        handler = AgentLayerCallbackHandler(client=client, agent_id="a1")
+        handler = CrewLayerCallbackHandler(client=client, agent_id="a1")
         rid1, rid2 = self._run_id(), self._run_id()
         handler.on_tool_start({"name": "tool1"}, "in1", run_id=rid1)
         handler.on_tool_start({"name": "tool2"}, "in2", run_id=rid2)
@@ -314,7 +314,7 @@ class TestAgentLayerCallbackHandler:
 
     def test_no_run_id_uses_fallback_tool_name(self) -> None:
         client = _make_client()
-        handler = AgentLayerCallbackHandler(client=client, agent_id="a1")
+        handler = CrewLayerCallbackHandler(client=client, agent_id="a1")
         handler.on_tool_end("result", run_id=None, name="my_tool")
         kw = client.actions.log.call_args[1]
         assert kw["tool_name"] == "my_tool"
