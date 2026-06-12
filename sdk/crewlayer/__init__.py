@@ -14,10 +14,14 @@ from crewlayer._types import (
     ActionStats,
     ContextEntry,
     ContextNamespace,
+    DiffLine,
     ExtractResult,
     MemoryItem,
     MemoryPage,
     Message,
+    PromptDiff,
+    PromptVersion,
+    PromptVersionPage,
     RecallResult,
     ShortMemory,
     ToolStat,
@@ -49,6 +53,11 @@ __all__ = [
     # Types — context
     "ContextEntry",
     "ContextNamespace",
+    # Types — prompts
+    "PromptVersion",
+    "PromptVersionPage",
+    "DiffLine",
+    "PromptDiff",
 ]
 
 __version__ = "0.1.0"

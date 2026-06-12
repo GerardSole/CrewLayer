@@ -20,6 +20,7 @@ from crewlayer.api.routes import (
     episodes,
     memory,
     metrics as metrics_route,
+    prompts,
     sessions,
     streaming,
     usage,
@@ -151,6 +152,7 @@ app.include_router(sessions.router, prefix="/v1", tags=["sessions"])
 app.include_router(streaming.router, prefix="/v1", tags=["streaming"])
 app.include_router(usage.router, prefix="/v1", tags=["usage"])
 app.include_router(audit.router, prefix="/v1", tags=["audit"])
+app.include_router(prompts.router, prefix="/v1", tags=["prompts"])
 app.include_router(metrics_route.router, tags=["observability"])
 
 

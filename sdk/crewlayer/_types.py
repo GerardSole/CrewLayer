@@ -193,6 +193,86 @@ class ActionStats:
 
 
 # ---------------------------------------------------------------------------
+# Prompts
+# ---------------------------------------------------------------------------
+
+@dataclass
+class PromptVersion:
+    """A single prompt version record."""
+    id: str
+    tenant_id: str
+    agent_id: str
+    version: int
+    content: str
+    is_active: bool
+    created_at: str
+    description: str | None = None
+    created_by: str | None = None
+
+    @classmethod
+    def _from(cls, d: dict[str, Any]) -> PromptVersion:
+        return cls(
+            id=d["id"],
+            tenant_id=d["tenant_id"],
+            agent_id=d["agent_id"],
+            version=d["version"],
+            content=d["content"],
+            is_active=d["is_active"],
+            created_at=d["created_at"],
+            description=d.get("description"),
+            created_by=d.get("created_by"),
+        )
+
+
+@dataclass
+class PromptVersionPage:
+    """List of prompt versions."""
+    items: list[PromptVersion]
+    count: int
+
+    @classmethod
+    def _from(cls, d: dict[str, Any]) -> PromptVersionPage:
+        return cls(
+            items=[PromptVersion._from(i) for i in d["items"]],
+            count=d["count"],
+        )
+
+
+@dataclass
+class DiffLine:
+    """A single line in a prompt diff."""
+    operation: str   # "equal" | "insert" | "delete"
+    content: str
+    line_a: int | None = None
+    line_b: int | None = None
+
+    @classmethod
+    def _from(cls, d: dict[str, Any]) -> DiffLine:
+        return cls(
+            operation=d["operation"],
+            content=d["content"],
+            line_a=d.get("line_a"),
+            line_b=d.get("line_b"),
+        )
+
+
+@dataclass
+class PromptDiff:
+    """Line-by-line diff between two prompt versions."""
+    version_id_a: str
+    version_id_b: str
+    lines: list[DiffLine]
+
+    @classmethod
+    def _from(cls, d: dict[str, Any]) -> PromptDiff:
+        return cls(
+            version_id_a=d["version_id_a"],
+            version_id_b=d["version_id_b"],
+            lines=[DiffLine._from(l) for l in d["lines"]],
+        )
+
+
+# ---------------------------------------------------------------------------
 # Context
 # ---------------------------------------------------------------------------
 

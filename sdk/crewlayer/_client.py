@@ -7,6 +7,7 @@ from crewlayer._actions import ActionsClient, AsyncActionsClient
 from crewlayer._context import AsyncContextClient, ContextClient
 from crewlayer._http import AsyncTransport, SyncTransport
 from crewlayer._memory import AsyncMemoryClient, MemoryClient
+from crewlayer._prompts import AsyncPromptsClient, PromptsClient
 
 _DEFAULT_BASE_URL = "http://localhost:8000"
 
@@ -37,6 +38,7 @@ class CrewLayerClient:
         self.memory = MemoryClient(self._http)
         self.actions = ActionsClient(self._http)
         self.context = ContextClient(self._http)
+        self.prompts = PromptsClient(self._http)
 
     def close(self) -> None:
         """Close the underlying HTTP connection pool."""
@@ -75,6 +77,7 @@ class CrewLayerAsyncClient:
         self.memory = AsyncMemoryClient(self._http)
         self.actions = AsyncActionsClient(self._http)
         self.context = AsyncContextClient(self._http)
+        self.prompts = AsyncPromptsClient(self._http)
 
     async def aclose(self) -> None:
         """Close the underlying HTTP connection pool."""
