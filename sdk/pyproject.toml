@@ -5,33 +5,83 @@ build-backend = "hatchling.build"
 [project]
 name = "crewlayer"
 version = "0.1.0"
-description = "Official Python SDK for CrewLayer — persistent memory and action logging for AI agents"
+description = "Open source memory & context backend for AI agents"
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }
-keywords = ["ai", "agents", "memory", "crewlayer"]
+authors = [
+    { name = "Gerard Solé", email = "gesoca2003@gmail.com" },
+]
+keywords = [
+    "ai",
+    "agents",
+    "memory",
+    "llm",
+    "langchain",
+    "autogen",
+    "crewai",
+    "llamaindex",
+    "context",
+    "crewlayer",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
+]
 dependencies = [
-    "httpx>=0.27.0",
+    "httpx>=0.27.0,<1.0",
 ]
 
 [project.optional-dependencies]
-langchain = ["langchain-core>=0.2.0"]
+langchain = ["langchain-core>=0.2.0,<1.0"]
 crewai = ["crewai>=0.28.0"]
 llamaindex = ["llama-index-core>=0.10.0"]
 autogen = ["pyautogen>=0.2.0"]
 all-integrations = [
-    "langchain-core>=0.2.0",
+    "langchain-core>=0.2.0,<1.0",
     "crewai>=0.28.0",
     "llama-index-core>=0.10.0",
     "pyautogen>=0.2.0",
 ]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "httpx>=0.27.0,<1.0",
+]
+build = [
+    "build>=1.2",
+    "twine>=6.0",
+]
 
 [project.urls]
-Homepage = "https://github.com/your-org/crewlayer"
-Documentation = "https://docs.crewlayer.dev"
+Homepage = "https://github.com/GerardSole/CrewLayer"
+Repository = "https://github.com/GerardSole/CrewLayer"
+Documentation = "https://github.com/GerardSole/CrewLayer/blob/main/sdk/README.md"
+"Bug Tracker" = "https://github.com/GerardSole/CrewLayer/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["crewlayer"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "crewlayer/**/*.py",
+    "crewlayer/py.typed",
+    "README.md",
+    "pyproject.toml",
+]
+exclude = [
+    "**/__pycache__",
+    "**/*.pyc",
+    "tests/",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
