@@ -2,8 +2,8 @@
 LangChain multi-turn conversation with persistent CrewLayer memory.
 
 Demonstrates:
-  - AgentLayerMemory: every message saved to Redis session store
-  - AgentLayerCallbackHandler: every tool call logged as CrewLayer action
+  - CrewLayerMemory: every message saved to Redis session store
+  - CrewLayerCallbackHandler: every tool call logged as CrewLayer action
   - Persistence across runs: run the script twice to see memory carry over
 
 Run:
@@ -18,7 +18,7 @@ import os
 import sys
 
 from crewlayer import CrewLayerClient
-from crewlayer.integrations.langchain import AgentLayerCallbackHandler, AgentLayerMemory
+from crewlayer.integrations.langchain import CrewLayerCallbackHandler, CrewLayerMemory
 
 API_KEY   = os.environ.get("CREWLAYER_API_KEY", "")
 BASE_URL  = os.environ.get("CREWLAYER_URL", "http://localhost:8000")
@@ -43,7 +43,7 @@ client = CrewLayerClient(api_key=API_KEY, base_url=BASE_URL)
 # ── Memory: persists the full conversation in CrewLayer's Redis store ─────────
 # All messages (user + AI) are stored under session_id="demo-conversation".
 # On the SECOND run the chain will load the existing history automatically.
-memory = AgentLayerMemory(
+memory = CrewLayerMemory(
     client=client,
     agent_id=AGENT_ID,
     session_id="demo-conversation",
@@ -52,7 +52,7 @@ memory = AgentLayerMemory(
 )
 
 # ── Callback handler: logs every tool invocation as a CrewLayer action ────────
-handler = AgentLayerCallbackHandler(
+handler = CrewLayerCallbackHandler(
     client=client,
     agent_id=AGENT_ID,
     session_id="demo-conversation",

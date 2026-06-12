@@ -81,8 +81,8 @@ python examples/langchain_conversation.py   # memory persists across runs
 ```
 
 Key classes:
-- `AgentLayerMemory` — `BaseChatMemory` backed by CrewLayer Redis session store
-- `AgentLayerCallbackHandler` — logs every LangChain tool call as a CrewLayer action
+- `CrewLayerMemory` — `BaseChatMemory` backed by CrewLayer Redis session store
+- `CrewLayerCallbackHandler` — logs every LangChain tool call as a CrewLayer action
 
 ---
 
