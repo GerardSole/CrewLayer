@@ -101,6 +101,47 @@ class ReplayStatusEnum(str, enum.Enum):
     failed = "failed"
 
 
+class RatingThumbsEnum(str, enum.Enum):
+    up = "up"
+    down = "down"
+
+
+class EvaluatorEnum(str, enum.Enum):
+    human = "human"
+    auto = "auto"
+
+
+class AnomalyTypeEnum(str, enum.Enum):
+    response_too_long = "response_too_long"
+    tool_overuse = "tool_overuse"
+    high_latency = "high_latency"
+    error_spike = "error_spike"
+    low_score_streak = "low_score_streak"
+
+
+class AnomalySeverityEnum(str, enum.Enum):
+    low = "low"
+    medium = "medium"
+    high = "high"
+
+
+class ABTestStatusEnum(str, enum.Enum):
+    active = "active"
+    completed = "completed"
+    stopped = "stopped"
+
+
+class ABTestWinnerEnum(str, enum.Enum):
+    a = "a"
+    b = "b"
+    inconclusive = "inconclusive"
+
+
+class ABTestVariantEnum(str, enum.Enum):
+    a = "a"
+    b = "b"
+
+
 class Tenant(Base):
     __tablename__ = "tenants"
 
@@ -517,6 +558,144 @@ class PromptTestResult(Base):
     )
     action_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class Evaluation(Base):
+    __tablename__ = "evaluations"
+    __table_args__ = (
+        Index("ix_evaluations_tenant_agent", "tenant_id", "agent_id"),
+        Index("ix_evaluations_action_id", "action_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    agent_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("agents.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    action_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("actions.id", ondelete="CASCADE"), nullable=False
+    )
+    session_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    prompt_version_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("prompt_versions.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    rating_thumbs: Mapped[RatingThumbsEnum | None] = mapped_column(
+        SAEnum(RatingThumbsEnum, name="rating_thumbs_enum"), nullable=True
+    )
+    rating_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    evaluator: Mapped[EvaluatorEnum] = mapped_column(
+        SAEnum(EvaluatorEnum, name="evaluator_enum"),
+        nullable=False,
+        server_default=EvaluatorEnum.human.value,
+    )
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False, server_default=func.now()
+    )
+    created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+
+
+class Anomaly(Base):
+    __tablename__ = "anomalies"
+    __table_args__ = (
+        Index("ix_anomalies_tenant_agent", "tenant_id", "agent_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    agent_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("agents.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    action_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("actions.id", ondelete="CASCADE"), nullable=False
+    )
+    anomaly_type: Mapped[AnomalyTypeEnum] = mapped_column(
+        SAEnum(AnomalyTypeEnum, name="anomaly_type_enum"), nullable=False
+    )
+    severity: Mapped[AnomalySeverityEnum] = mapped_column(
+        SAEnum(AnomalySeverityEnum, name="anomaly_severity_enum"), nullable=False
+    )
+    details: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, server_default="{}")
+    resolved: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    resolved_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class ABTest(Base):
+    __tablename__ = "ab_tests"
+    __table_args__ = (
+        Index("ix_ab_tests_tenant_agent", "tenant_id", "agent_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    agent_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("agents.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[ABTestStatusEnum] = mapped_column(
+        SAEnum(ABTestStatusEnum, name="ab_test_status_enum"),
+        nullable=False,
+        server_default=ABTestStatusEnum.active.value,
+    )
+    variant_a_prompt_version_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("prompt_versions.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    variant_b_prompt_version_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("prompt_versions.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    traffic_split: Mapped[float] = mapped_column(Float, nullable=False, server_default="0.5")
+    started_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False, server_default=func.now()
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+    winner: Mapped[ABTestWinnerEnum | None] = mapped_column(
+        SAEnum(ABTestWinnerEnum, name="ab_test_winner_enum"), nullable=True
+    )
+
+
+class ABTestAssignment(Base):
+    __tablename__ = "ab_test_assignments"
+    __table_args__ = (
+        UniqueConstraint("ab_test_id", "session_id", name="uq_ab_test_session"),
+        Index("ix_ab_test_assignments_test_id", "ab_test_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    ab_test_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("ab_tests.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    session_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    variant: Mapped[ABTestVariantEnum] = mapped_column(
+        SAEnum(ABTestVariantEnum, name="ab_test_variant_enum"), nullable=False
+    )
+    assigned_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), nullable=False, server_default=func.now()
     )
 

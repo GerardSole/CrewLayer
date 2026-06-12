@@ -5,6 +5,7 @@ from typing import Any
 
 from crewlayer._actions import ActionsClient, AsyncActionsClient
 from crewlayer._context import AsyncContextClient, ContextClient
+from crewlayer._evaluations import AsyncEvaluationsClient, EvaluationsClient
 from crewlayer._http import AsyncTransport, SyncTransport
 from crewlayer._memory import AsyncMemoryClient, MemoryClient
 from crewlayer._prompts import AsyncPromptsClient, PromptsClient
@@ -39,6 +40,7 @@ class CrewLayerClient:
         self.actions = ActionsClient(self._http)
         self.context = ContextClient(self._http)
         self.prompts = PromptsClient(self._http)
+        self.evaluations = EvaluationsClient(self._http)
 
     def close(self) -> None:
         """Close the underlying HTTP connection pool."""
@@ -78,6 +80,7 @@ class CrewLayerAsyncClient:
         self.actions = AsyncActionsClient(self._http)
         self.context = AsyncContextClient(self._http)
         self.prompts = AsyncPromptsClient(self._http)
+        self.evaluations = AsyncEvaluationsClient(self._http)
 
     async def aclose(self) -> None:
         """Close the underlying HTTP connection pool."""

@@ -16,6 +16,11 @@ class SessionUpdate(BaseModel):
     episode_id: uuid.UUID | None = None
 
 
+class ActivePromptInfo(BaseModel):
+    content: str
+    version: int
+
+
 class SessionResponse(BaseModel):
     id: uuid.UUID
     tenant_id: uuid.UUID
@@ -27,11 +32,12 @@ class SessionResponse(BaseModel):
     started_at: datetime
     closed_at: datetime | None
     metadata: dict[str, Any]
+    active_prompt: ActivePromptInfo | None = None
 
     model_config = {"from_attributes": True}
 
     @classmethod
-    def from_orm(cls, obj: Any) -> "SessionResponse":
+    def from_orm(cls, obj: Any, active_prompt: ActivePromptInfo | None = None) -> "SessionResponse":
         return cls(
             id=obj.id,
             tenant_id=obj.tenant_id,
@@ -43,6 +49,7 @@ class SessionResponse(BaseModel):
             started_at=obj.started_at,
             closed_at=obj.closed_at,
             metadata=obj.metadata_,
+            active_prompt=active_prompt,
         )
 
 

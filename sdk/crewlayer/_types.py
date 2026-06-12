@@ -320,3 +320,189 @@ class ContextNamespace:
             entries=[ContextEntry._from(e) for e in d["entries"]],
             count=d["count"],
         )
+
+
+# ---------------------------------------------------------------------------
+# Evaluations
+# ---------------------------------------------------------------------------
+
+@dataclass
+class EvaluationRecord:
+    """A single evaluation (human or automated) for an action."""
+    id: str
+    tenant_id: str
+    agent_id: str
+    action_id: str
+    evaluator: str
+    created_at: str
+    session_id: str | None = None
+    prompt_version_id: str | None = None
+    rating_thumbs: str | None = None
+    rating_score: float | None = None
+    notes: str | None = None
+    created_by: str | None = None
+
+    @classmethod
+    def _from(cls, d: dict[str, Any]) -> EvaluationRecord:
+        return cls(
+            id=d["id"],
+            tenant_id=d["tenant_id"],
+            agent_id=d["agent_id"],
+            action_id=d["action_id"],
+            evaluator=d["evaluator"],
+            created_at=d["created_at"],
+            session_id=d.get("session_id"),
+            prompt_version_id=d.get("prompt_version_id"),
+            rating_thumbs=d.get("rating_thumbs"),
+            rating_score=d.get("rating_score"),
+            notes=d.get("notes"),
+            created_by=d.get("created_by"),
+        )
+
+
+@dataclass
+class DayTrend:
+    """Daily evaluation aggregates."""
+    day: str
+    count: int
+    thumbs_up: int
+    thumbs_down: int
+    avg_score: float | None = None
+
+    @classmethod
+    def _from(cls, d: dict[str, Any]) -> DayTrend:
+        return cls(
+            day=d["day"],
+            count=d["count"],
+            thumbs_up=d["thumbs_up"],
+            thumbs_down=d["thumbs_down"],
+            avg_score=d.get("avg_score"),
+        )
+
+
+@dataclass
+class EvaluationSummary:
+    """Aggregated evaluation metrics for an agent."""
+    agent_id: str
+    total_evaluations: int
+    thumbs_up: int
+    thumbs_down: int
+    thumbs_up_ratio: float
+    trend_7d: list[DayTrend]
+    avg_score: float | None = None
+
+    @classmethod
+    def _from(cls, d: dict[str, Any]) -> EvaluationSummary:
+        return cls(
+            agent_id=d["agent_id"],
+            total_evaluations=d["total_evaluations"],
+            thumbs_up=d["thumbs_up"],
+            thumbs_down=d["thumbs_down"],
+            thumbs_up_ratio=d["thumbs_up_ratio"],
+            trend_7d=[DayTrend._from(t) for t in d.get("trend_7d", [])],
+            avg_score=d.get("avg_score"),
+        )
+
+
+@dataclass
+class AnomalyRecord:
+    """A detected anomaly for an agent."""
+    id: str
+    tenant_id: str
+    agent_id: str
+    action_id: str
+    anomaly_type: str
+    severity: str
+    details: dict[str, Any]
+    resolved: bool
+    created_at: str
+    resolved_at: str | None = None
+
+    @classmethod
+    def _from(cls, d: dict[str, Any]) -> AnomalyRecord:
+        return cls(
+            id=d["id"],
+            tenant_id=d["tenant_id"],
+            agent_id=d["agent_id"],
+            action_id=d["action_id"],
+            anomaly_type=d["anomaly_type"],
+            severity=d["severity"],
+            details=d["details"],
+            resolved=d["resolved"],
+            created_at=d["created_at"],
+            resolved_at=d.get("resolved_at"),
+        )
+
+
+@dataclass
+class ABTestRecord:
+    """An A/B test comparing two prompt versions."""
+    id: str
+    tenant_id: str
+    agent_id: str
+    name: str
+    status: str
+    variant_a_prompt_version_id: str
+    variant_b_prompt_version_id: str
+    traffic_split: float
+    started_at: str
+    completed_at: str | None = None
+    winner: str | None = None
+
+    @classmethod
+    def _from(cls, d: dict[str, Any]) -> ABTestRecord:
+        return cls(
+            id=d["id"],
+            tenant_id=d["tenant_id"],
+            agent_id=d["agent_id"],
+            name=d["name"],
+            status=d["status"],
+            variant_a_prompt_version_id=d["variant_a_prompt_version_id"],
+            variant_b_prompt_version_id=d["variant_b_prompt_version_id"],
+            traffic_split=d["traffic_split"],
+            started_at=d["started_at"],
+            completed_at=d.get("completed_at"),
+            winner=d.get("winner"),
+        )
+
+
+@dataclass
+class VariantResults:
+    """Comparative metrics for one variant in an A/B test."""
+    variant: str
+    prompt_version_id: str
+    total_actions: int
+    error_rate: float
+    thumbs_up_ratio: float
+    avg_score: float | None = None
+
+    @classmethod
+    def _from(cls, d: dict[str, Any]) -> VariantResults:
+        return cls(
+            variant=d["variant"],
+            prompt_version_id=d["prompt_version_id"],
+            total_actions=d["total_actions"],
+            error_rate=d["error_rate"],
+            thumbs_up_ratio=d["thumbs_up_ratio"],
+            avg_score=d.get("avg_score"),
+        )
+
+
+@dataclass
+class ABTestResults:
+    """Full results of an A/B test."""
+    ab_test_id: str
+    name: str
+    status: str
+    variant_a: VariantResults
+    variant_b: VariantResults
+
+    @classmethod
+    def _from(cls, d: dict[str, Any]) -> ABTestResults:
+        return cls(
+            ab_test_id=d["ab_test_id"],
+            name=d["name"],
+            status=d["status"],
+            variant_a=VariantResults._from(d["variant_a"]),
+            variant_b=VariantResults._from(d["variant_b"]),
+        )

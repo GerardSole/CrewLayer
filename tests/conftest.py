@@ -13,15 +13,19 @@ from crewlayer.core.config import settings
 from crewlayer.core.redis import get_redis
 from crewlayer.core.streaming.context_broker import ContextBroker
 from crewlayer.db.models import (
+    ABTest,
+    ABTestAssignment,
     Action,
     Agent,
     AgentRelation,
+    Anomaly,
     ApiKey,
     AuditLog,
     ContextEntry,
     ContextHistory,
     Episode,
     EpisodeMemory,
+    Evaluation,
     Memory,
     PromptTestResult,
     PromptVersion,
@@ -40,7 +44,7 @@ _engine = create_async_engine(settings.DATABASE_URL, poolclass=NullPool)
 _TestSession = async_sessionmaker(_engine, expire_on_commit=False)
 
 # Deletion order respects FK constraints (children before parents)
-_CLEANUP_ORDER = [AuditLog, ApiKey, PromptTestResult, Action, Replay, ContextHistory, ContextEntry, EpisodeMemory, Memory, WebhookDelivery, WebhookEndpoint, Session, Episode, AgentRelation, PromptVersion, Agent, Tenant]
+_CLEANUP_ORDER = [AuditLog, ApiKey, ABTestAssignment, ABTest, Anomaly, Evaluation, PromptTestResult, Action, Replay, ContextHistory, ContextEntry, EpisodeMemory, Memory, WebhookDelivery, WebhookEndpoint, Session, Episode, AgentRelation, PromptVersion, Agent, Tenant]
 
 
 @pytest_asyncio.fixture

@@ -9,12 +9,18 @@ from crewlayer._exceptions import (
     ServerError,
 )
 from crewlayer._types import (
+    ABTestRecord,
+    ABTestResults,
     ActionPage,
     ActionRecord,
     ActionStats,
+    AnomalyRecord,
     ContextEntry,
     ContextNamespace,
+    DayTrend,
     DiffLine,
+    EvaluationRecord,
+    EvaluationSummary,
     ExtractResult,
     MemoryItem,
     MemoryPage,
@@ -25,6 +31,7 @@ from crewlayer._types import (
     RecallResult,
     ShortMemory,
     ToolStat,
+    VariantResults,
 )
 
 __all__ = [
@@ -58,6 +65,14 @@ __all__ = [
     "PromptVersionPage",
     "DiffLine",
     "PromptDiff",
+    # Types — evaluations
+    "EvaluationRecord",
+    "EvaluationSummary",
+    "DayTrend",
+    "AnomalyRecord",
+    "ABTestRecord",
+    "ABTestResults",
+    "VariantResults",
 ]
 
 __version__ = "0.1.0"

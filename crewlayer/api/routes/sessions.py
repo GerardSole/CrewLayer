@@ -7,8 +7,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from crewlayer.api.deps import DbDep, RedisDep, TenantDep, check_scope
-from crewlayer.api.schemas.sessions import SessionCloseResponse, SessionCreate, SessionResponse, SessionUpdate
+from crewlayer.api.schemas.sessions import ActivePromptInfo, SessionCloseResponse, SessionCreate, SessionResponse, SessionUpdate
 from crewlayer.core.agents.status import cache_status
+from crewlayer.core.evaluation.abtesting import ABTestManager
 from crewlayer.core.memory.episodic import EpisodeNotFoundError, EpisodicMemory, SessionNotFoundError as EpisodicSessionNotFoundError
 from crewlayer.core.memory.short import ShortMemory
 from crewlayer.core.sessions.manager import SessionManager, SessionNotActiveError, SessionNotFoundError
@@ -48,7 +49,16 @@ async def create_session(
     await db.commit()
     await db.refresh(sess)
     await cache_status(body.agent_id, AgentStatusEnum.working, sess.id, sess.started_at, redis)
-    return SessionResponse.from_orm(sess)
+    ab_mgr = ABTestManager(db)
+    prompt_version = await ab_mgr.get_active_prompt(tenant.id, body.agent_id, sess.id)
+    await db.commit()
+    active_prompt: ActivePromptInfo | None = None
+    if prompt_version is not None:
+        active_prompt = ActivePromptInfo(
+            content=prompt_version.content,
+            version=prompt_version.version,
+        )
+    return SessionResponse.from_orm(sess, active_prompt=active_prompt)
 
 
 @router.get(

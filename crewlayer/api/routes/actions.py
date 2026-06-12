@@ -21,16 +21,82 @@ from crewlayer.api.schemas.actions import (
 )
 from crewlayer.core.actions.alerts import check_and_fire_alerts
 from crewlayer.core.actions.logger import ActionFilters, ActionLogger
+from crewlayer.core.evaluation.anomalies import AnomalyManager
+from crewlayer.core.webhooks.dispatcher import dispatch
+from crewlayer.db.models import Action as _BGAction
 from crewlayer.core.actions.replay import (
     create_replay,
     get_replay,
     list_replays,
     replay_event_stream,
 )
-from crewlayer.core.webhooks.dispatcher import dispatch
-from crewlayer.db.models import ActionStatus, Agent, Replay, ReplayStatusEnum, Session, SessionStatus
-
+from crewlayer.db.models import (
+    ActionStatus,
+    Agent,
+    AnomalySeverityEnum,
+    Replay,
+    ReplayStatusEnum,
+    Session,
+    SessionStatus,
+)
 router = APIRouter()
+
+
+async def _detect_anomalies_bg(
+    tenant_id: uuid.UUID,
+    agent_id: uuid.UUID,
+    action_id: uuid.UUID,
+    agent_config: dict,
+) -> None:
+    """Run anomaly detection in a dedicated session so it never blocks the request.
+
+    Uses NullPool so this task never reuses connections across event-loop boundaries.
+    """
+    import logging as _logging
+    import contextlib
+    import redis.asyncio as aioredis
+    from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+    from sqlalchemy.pool import NullPool
+    from crewlayer.core.config import settings as _settings
+    _log = _logging.getLogger(__name__)
+
+    bg_engine = create_async_engine(_settings.DATABASE_URL, poolclass=NullPool)
+    BGSession = async_sessionmaker(bg_engine, expire_on_commit=False)
+    try:
+        redis_client = aioredis.from_url(_settings.REDIS_URL, decode_responses=True)
+        try:
+            async with BGSession() as db:
+                action_result = await db.execute(
+                    select(_BGAction).where(_BGAction.id == action_id)
+                )
+                action = action_result.scalar_one_or_none()
+                if action is None:
+                    return
+                mgr = AnomalyManager(db)
+                anomalies = await mgr.detect(
+                    tenant_id, agent_id, action, agent_config, redis_client
+                )
+                await db.commit()
+                for anomaly in anomalies:
+                    if anomaly.severity == AnomalySeverityEnum.high:
+                        await dispatch(
+                            tenant_id,
+                            "evaluation.anomaly_detected",
+                            {
+                                "anomaly_id": str(anomaly.id),
+                                "agent_id": str(agent_id),
+                                "anomaly_type": anomaly.anomaly_type.value,
+                                "severity": anomaly.severity.value,
+                                "details": anomaly.details,
+                            },
+                        )
+        finally:
+            await redis_client.aclose()
+    except Exception:
+        _log.exception("Anomaly detection background task failed")
+    finally:
+        with contextlib.suppress(Exception):
+            await bg_engine.dispose()
 
 
 async def _validate_session(
@@ -93,6 +159,9 @@ async def log_action(
     )
     await db.commit()
     await db.refresh(action)
+    asyncio.create_task(
+        _detect_anomalies_bg(tenant.id, agent_id, action.id, agent.config or {})
+    )
     _webhook_payload = {
         "action_id": str(action.id),
         "agent_id": str(agent_id),
