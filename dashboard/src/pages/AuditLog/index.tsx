@@ -19,7 +19,7 @@ function statusVariant(code: number): 'success' | 'error' | 'warning' | 'seconda
 }
 
 const METHOD_COLORS: Record<string, string> = {
-  GET: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+  GET: 'bg-zinc-500/10 text-zinc-300 border-zinc-500/20',
   POST: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
   PATCH: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
   PUT: 'bg-amber-500/10 text-amber-400 border-amber-500/20',

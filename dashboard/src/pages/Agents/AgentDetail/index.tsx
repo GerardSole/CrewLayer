@@ -382,7 +382,7 @@ function AgentOverviewTab({ agentId }: { agentId: string }) {
           label="Total Actions"
           value={statsLoading ? '—' : formatNumber(stats?.total_actions ?? 0)}
           icon={ListChecks}
-          iconColor="text-blue-400"
+          iconColor="text-zinc-300"
           loading={statsLoading}
         />
         <MiniStat

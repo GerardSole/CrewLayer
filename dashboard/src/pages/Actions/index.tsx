@@ -44,7 +44,7 @@ const STATUS_BG: Record<ActionStatus, string> = {
   success: 'bg-emerald-500',
   error: 'bg-red-500',
   timeout: 'bg-amber-400',
-  pending: 'bg-sky-400',
+  pending: 'bg-zinc-400',
 }
 
 // ── JSON Viewer ────────────────────────────────────────────────────────────────
@@ -88,8 +88,8 @@ function tokenizeJson(json: string): Token[] {
 }
 
 const TC: Record<string, string> = {
-  key: 'text-sky-400', string: 'text-emerald-400', number: 'text-amber-400',
-  boolean: 'text-violet-400', null: 'text-rose-400', punct: 'text-muted-foreground',
+  key: 'text-zinc-300', string: 'text-emerald-400', number: 'text-amber-400',
+  boolean: 'text-amber-300', null: 'text-rose-400', punct: 'text-muted-foreground',
 }
 
 function JsonViewer({ value, maxH = 'max-h-52' }: { value: unknown; maxH?: string }) {

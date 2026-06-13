@@ -114,7 +114,7 @@ function KpiCard({
 // ── Activity row ──────────────────────────────────────────────────────────────
 
 const METHOD_COLOR: Record<string, string> = {
-  GET: 'text-blue-400',
+  GET: 'text-zinc-300',
   POST: 'text-emerald-400',
   PATCH: 'text-amber-400',
   PUT: 'text-amber-400',
@@ -285,7 +285,7 @@ export default function OverviewPage() {
           title="Total Agents"
           value={agentsLoading ? '—' : allAgents.length}
           icon={Bot}
-          iconColor="text-blue-400"
+          iconColor="text-zinc-300"
           loading={agentsLoading}
           sub={{ text: `${allAgents.filter((a) => a.status === 'idle').length} idle` }}
         />
@@ -305,7 +305,7 @@ export default function OverviewPage() {
           title="Requests Today"
           value={usageLoading ? '—' : formatNumber(usage?.usage.requests_today ?? 0)}
           icon={Activity}
-          iconColor="text-violet-400"
+          iconColor="text-amber-400"
           loading={usageLoading}
           sub={{ text: `${usage?.usage.requests_this_minute ?? 0}/min now` }}
         />
