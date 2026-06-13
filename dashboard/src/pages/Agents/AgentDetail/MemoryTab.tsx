@@ -639,7 +639,7 @@ export function MemoryTab({ agentId }: { agentId: string }) {
       {stats && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
-            { label: 'Active', value: stats.total_active, icon: Brain, color: 'text-blue-400' },
+            { label: 'Active', value: stats.total_active, icon: Brain, color: 'text-zinc-300' },
             { label: 'Archived', value: stats.total_archived, icon: Archive, color: 'text-muted-foreground' },
             {
               label: 'Avg Importance',

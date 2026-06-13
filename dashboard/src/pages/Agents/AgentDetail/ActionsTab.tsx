@@ -90,10 +90,10 @@ function tokenizeJson(json: string): Token[] {
 }
 
 const TOKEN_CLASS: Record<string, string> = {
-  key: 'text-sky-400',
+  key: 'text-zinc-300',
   string: 'text-emerald-400',
   number: 'text-amber-400',
-  boolean: 'text-violet-400',
+  boolean: 'text-amber-300',
   null: 'text-rose-400',
   punct: 'text-muted-foreground',
   ws: '',
@@ -144,7 +144,7 @@ const STATUS_BG: Record<ActionStatus, string> = {
   success: 'bg-emerald-500',
   error: 'bg-red-500',
   timeout: 'bg-amber-400',
-  pending: 'bg-sky-400',
+  pending: 'bg-zinc-400',
 }
 
 // ── Tool filter ────────────────────────────────────────────────────────────────
@@ -761,7 +761,7 @@ function ActionStatsBar({ agentId }: { agentId: string }) {
       <Card>
         <CardContent className="p-4">
           <div className="flex items-center gap-1.5 mb-1.5">
-            <Activity className="h-3.5 w-3.5 text-blue-400" />
+            <Activity className="h-3.5 w-3.5 text-zinc-300" />
             <span className="text-xs text-muted-foreground">Total</span>
           </div>
           <div className="text-xl font-bold">{formatNumber(stats.total_actions)}</div>

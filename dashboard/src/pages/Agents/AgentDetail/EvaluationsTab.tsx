@@ -295,8 +295,8 @@ function NewABTestModal({
               className="w-full accent-primary"
             />
             <div className="h-2 rounded-full overflow-hidden bg-muted flex">
-              <div className="h-full bg-sky-500 transition-all" style={{ width: `${split}%` }} />
-              <div className="h-full bg-violet-500 flex-1 transition-all" />
+              <div className="h-full bg-emerald-500 transition-all" style={{ width: `${split}%` }} />
+              <div className="h-full bg-zinc-500 flex-1 transition-all" />
             </div>
           </div>
           <div className="flex gap-2 pt-2">
@@ -373,8 +373,8 @@ function ABTestsSection({ agentId }: { agentId: string }) {
                       </div>
                     </div>
                     <div className="h-2 rounded-full overflow-hidden bg-muted flex">
-                      <div className="h-full bg-sky-500" style={{ width: `${test.traffic_split * 100}%` }} />
-                      <div className="h-full bg-violet-500 flex-1" />
+                      <div className="h-full bg-emerald-500" style={{ width: `${test.traffic_split * 100}%` }} />
+                      <div className="h-full bg-zinc-500 flex-1" />
                     </div>
                     {expandedId === test.id && <ABTestResults agentId={agentId} testId={test.id} />}
                   </CardContent>
@@ -581,12 +581,12 @@ export function EvaluationsTab({ agentId }: { agentId: string }) {
               <YAxis yAxisId="count" orientation="right" tick={CHART.tick} tickLine={false} axisLine={false} />
               <Tooltip {...CHART.tooltip} />
               <Line yAxisId="score" type="monotone" dataKey="avg_score" stroke="hsl(142 71% 45%)" strokeWidth={2} dot={false} name="Avg Score" connectNulls />
-              <Line yAxisId="count" type="monotone" dataKey="count" stroke="hsl(217.2 91.2% 59.8%)" strokeWidth={1.5} dot={false} name="Count" strokeDasharray="4 2" />
+              <Line yAxisId="count" type="monotone" dataKey="count" stroke="hsl(0 0% 60%)" strokeWidth={1.5} dot={false} name="Count" strokeDasharray="4 2" />
             </LineChart>
           </ResponsiveContainer>
           <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground justify-end">
             <span className="flex items-center gap-1.5"><span className="inline-block h-0.5 w-4 bg-emerald-400 rounded" />Avg Score</span>
-            <span className="flex items-center gap-1.5"><span className="inline-block h-0.5 w-4 bg-blue-400 rounded border-dashed" />Count</span>
+            <span className="flex items-center gap-1.5"><span className="inline-block h-0.5 w-4 bg-zinc-400 rounded border-dashed" />Count</span>
           </div>
         </CardContent>
       </Card>

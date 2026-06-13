@@ -357,8 +357,8 @@ export default function EvaluationsPage() {
                           {test.agentName} · Split {Math.round(test.traffic_split * 100)}% A / {Math.round((1 - test.traffic_split) * 100)}% B
                         </p>
                         <div className="h-1.5 rounded-full overflow-hidden bg-muted flex mt-2 w-48">
-                          <div className="h-full bg-sky-500" style={{ width: `${test.traffic_split * 100}%` }} />
-                          <div className="h-full bg-violet-500 flex-1" />
+                          <div className="h-full bg-emerald-500" style={{ width: `${test.traffic_split * 100}%` }} />
+                          <div className="h-full bg-zinc-500 flex-1" />
                         </div>
                       </div>
                       <Badge variant="secondary">{formatRelativeTime(test.started_at)}</Badge>
