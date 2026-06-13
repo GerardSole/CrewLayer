@@ -1,5 +1,10 @@
 # CrewLayer
 
+[![CI](https://github.com/GerardSole/CrewLayer/actions/workflows/ci.yml/badge.svg)](https://github.com/GerardSole/CrewLayer/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/GerardSole/CrewLayer/branch/master/graph/badge.svg)](https://codecov.io/gh/GerardSole/CrewLayer)
+[![PyPI](https://img.shields.io/pypi/v/crewlayer)](https://pypi.org/project/crewlayer/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 Open source backend for AI agents. Drop-in persistent memory, shared context, and full action history for any agent framework — in minutes.
 
 ```bash
