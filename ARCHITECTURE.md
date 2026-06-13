@@ -14,7 +14,10 @@ Claude Desktop / Claude Code
 Python SDK (sdk/)  TypeScript SDK (sdk-typescript/)  CLI (crewlayer cli)
         │                    │                │
         └────────────────────┴────────────────┘
-                             │ HTTP (X-API-Key)
+                             │ HTTP (X-API-Key)       Dashboard (React/Vite)
+                             │                              │ /dashboard/
+                             └──────────────────────────────┘
+                             │ HTTP (X-API-Key / JWT)
                              ▼
                        FastAPI (async)
                              │
@@ -181,26 +184,68 @@ Export/import as a self-contained JSON snapshot.
 4. Returns an `id_map` (old UUID → new UUID) for every resource type.
 5. `asyncio.create_task(regenerate_embeddings_background(new_memory_ids))` re-embeds all memories in background using a separate `AsyncSessionLocal()` — the import response is returned immediately.
 
+#### Evaluation layer (`core/evaluation/`)
+
+Tables: `evaluations`, `anomalies`, `ab_tests`, `ab_test_assignments`.
+
+**Evaluations** (`evaluations`): Human ratings attached to actions — thumbs up/down and/or a numeric 1–5 score. Optional `prompt_version_id` FK enables per-version quality tracking.
+
+**Anomaly detection** (`anomalies`): `AnomalyManager` is called after action writes. Detects:
+- `latency_spike` — action duration ≥ 3× the agent's rolling average
+- `error_burst` — ≥ 5 consecutive errors (reuses the Redis counter from `actions/alerts.py`)
+- `evaluation_drop` — rolling avg score drops below a tenant-configured threshold
+
+Detected anomalies fire `agent.anomaly` webhooks and are surfaced in the Evaluations dashboard page.
+
+**A/B testing** (`ab_tests`, `ab_test_assignments`): Compare two `PromptVersion` variants. Sessions are assigned to variant A or B based on `traffic_split` (default 0.5). `GET .../ab-tests/{id}/results` returns comparative metrics per variant (avg score, thumbs ratio, error rate). `POST .../ab-tests/{id}/complete` declares a winner and optionally activates the winning prompt version.
+
+```
+Action logged (POST /v1/agents/{id}/actions)
+  │
+  ├── AnomalyManager.check_after_action()
+  │     └── detect latency_spike / error_burst → insert anomaly row
+  │
+  └── ABTestManager.get_assignment()   ← if an active A/B test exists for this agent
+        └── assign session to variant A or B → record in ab_test_assignments
+```
+
+#### Prompt management (`core/prompts/`)
+
+Table: `prompt_versions`.
+
+Each agent can have multiple `PromptVersion` rows, auto-incremented by version number. At most one version has `is_active=True`; `PromptManager.activate()` atomically deactivates the current one. `actions.prompt_version_id` (nullable FK) links every logged action to the prompt that was active when it ran, enabling per-version quality metrics in evaluations and A/B tests.
+
+`GET /v1/agents/{id}/prompts/diff?a=<id>&b=<id>` returns a line-by-line unified diff. `POST .../rollback` activates the version immediately before the current active one.
+
 ### Database (`crewlayer/db/`)
 
 Nine tables:
 
 ```
 tenants
-  └── api_keys          (FK → tenants; scopes text[]; agent_ids uuid[]; bcrypt hash)
-  └── agents            (status enum; status_updated_at; current_session_id; tags text[])
-       └── sessions     (FK → agents; episode_id FK nullable; status enum; started_at/closed_at)
-       └── memories     (vector(1536); base_importance; merged_from uuid[];
-                         status enum active/archived; soft-delete via deleted_at)
-       └── actions      (immutable append-only)
-       └── episodes     (title; status enum active/completed/archived; summary; started_at/completed_at)
-  └── episode_memories  (composite PK: episode_id + memory_id; join table)
-  └── agent_relations   (supervisor_id, subordinate_id, relation_type enum; unique per pair)
-  └── context_entries   (unique on tenant+namespace+key; expires_at; written_by)
-  └── context_history   (immutable; namespace, key, value, version, operation enum, created_at)
-  └── webhooks          (url, events[], secret_hash)
-  └── audit_log         (immutable; tenant_id, api_key_id, method, path,
-                         status_code, request_body, response_body, created_at)
+  └── api_keys            (FK → tenants; scopes text[]; agent_ids uuid[]; bcrypt hash)
+  └── agents              (status enum; status_updated_at; current_session_id; tags text[])
+       └── sessions        (FK → agents; episode_id FK nullable; status enum; started_at/closed_at)
+       └── memories        (vector(1536); base_importance; merged_from uuid[];
+                            status enum active/archived; soft-delete via deleted_at)
+       └── actions         (immutable append-only; prompt_version_id FK nullable → prompt_versions)
+       └── episodes        (title; status enum active/completed/archived; summary; started_at/completed_at)
+       └── prompt_versions (version int auto-increment; content text; is_active bool;
+                            description; created_by FK → api_keys)
+       └── evaluations     (action_id FK; rating_thumbs enum up/down; rating_score 1–5;
+                            prompt_version_id FK nullable; notes; created_by FK → api_keys)
+       └── anomalies       (anomaly_type enum; severity enum; resolved bool; metadata jsonb)
+       └── ab_tests        (name; variant_a/b_prompt_version_id FK; traffic_split float;
+                            status enum; winner enum nullable)
+       └── ab_test_assignments (ab_test_id FK; session_id FK; variant enum A/B;
+                                unique on ab_test_id + session_id)
+  └── episode_memories    (composite PK: episode_id + memory_id; join table)
+  └── agent_relations     (supervisor_id, subordinate_id, relation_type enum; unique per pair)
+  └── context_entries     (unique on tenant+namespace+key; expires_at; written_by)
+  └── context_history     (immutable; namespace, key, value, version, operation enum, created_at)
+  └── webhooks            (url, events[], secret_hash)
+  └── audit_log           (immutable; tenant_id, api_key_id, method, path,
+                           status_code, request_body, response_body, created_at)
 ```
 
 All tables use `UUID` primary keys (`uuid4`). All timestamps are `TIMESTAMPTZ`.
@@ -214,6 +259,12 @@ Key enum types:
 - `episode_status_enum` (active/completed/archived)
 - `agent_relation_type_enum` (supervisor/collaborator/delegate)
 - `context_operation_enum` (created/updated/deleted/rollback)
+- `rating_thumbs_enum` (up/down)
+- `anomaly_type_enum` (latency_spike/error_burst/evaluation_drop)
+- `anomaly_severity_enum` (low/medium/high/critical)
+- `ab_test_status_enum` (active/completed/cancelled)
+- `ab_test_variant_enum` (A/B)
+- `ab_test_winner_enum` (A/B/inconclusive)
 
 ### Security
 
@@ -274,6 +325,35 @@ Installable as `npm install crewlayer` (or local `npm install ./sdk-typescript`)
 - Same retry and error hierarchy as the Python SDK
 - `client.context.subscribe({ namespace, key })` → `ContextSSEStream` with `.on("updated" | "deleted" | "error" | "close", handler)` and `.close()`
 - Built with tsup → ESM (`dist/index.mjs`) + CJS (`dist/index.js`) + TypeScript declarations
+
+### Dashboard (`dashboard/`)
+
+Web interface built with **React 18**, **React Router v6**, **TanStack Query v5**, **Recharts**, and **Radix UI / shadcn-ui** primitives. Styled with Tailwind CSS.
+
+**Pages:**
+
+| Page | Description |
+|---|---|
+| Overview | Metrics summary — active agents, error rate, memory/action counts, 7-day usage chart |
+| Agents | CRUD agent list; per-agent detail view with tabs: Memory, Actions, Evaluations, Prompts |
+| Memory | Long-term memories across all agents; semantic search via `POST /memory/recall` |
+| Actions | Global action log with tool, status, and date filters |
+| Evaluations | Thumbs/score trend charts, per-prompt-version breakdown, A/B test results |
+| Prompts | Version history table, line-by-line diff viewer, activate/rollback controls |
+| Blackboard | Live key/value view with SSE real-time updates |
+| Webhooks | Register and manage webhook endpoints |
+| Audit Log | Immutable audit trail, cursor-paginated |
+| Settings | API key and tenant configuration |
+
+`Ctrl+K` / `Cmd+K` opens the command palette for keyboard-driven navigation between pages.
+
+**Serving in production:**
+
+`docker compose build` runs `npm run build` inside `dashboard/` (base URL `/dashboard/`), producing `dashboard/dist/`. `main.py` serves it via:
+- `GET /dashboard/assets/*` — direct static file mount
+- `GET /dashboard/{path:path}` — SPA catch-all returns `index.html`
+
+In development (`npm run dev`), Vite runs on `localhost:5173` and proxies `/v1/*` and `/health` to `localhost:8000`.
 
 ### CLI (`crewlayer/cli/`)
 

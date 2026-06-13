@@ -16,7 +16,8 @@ alembic upgrade head
 uvicorn main:app --reload
 ```
 
-API docs: http://localhost:8000/docs
+API docs: http://localhost:8000/docs  
+Dashboard: http://localhost:8000/dashboard
 
 ---
 
@@ -44,6 +45,11 @@ API docs: http://localhost:8000/docs
 | **Granular API keys** | Per-key scope restrictions (`memory:read`, `actions:write`, …) and agent-level restrictions |
 | **MCP server** | Native integration with Claude Desktop and Claude Code via 9 MCP tools |
 | **Prometheus metrics** | Auto HTTP metrics + 6 custom Gauges; Grafana dashboard included |
+| **Dashboard web** | React + Vite management UI served at `/dashboard` — agents, memory, actions, evaluations, prompts, blackboard |
+| **Prompt management** | Version-controlled prompts with line-by-line diff, activate/rollback, and per-version quality metrics |
+| **Evaluation layer** | Human ratings (thumbs + score) per action; aggregated metrics, 7-day trend, per-version breakdown |
+| **A/B testing** | Compare two prompt versions; session assignment, per-variant metrics, declare winner |
+| **Automatic anomaly detection** | Detects latency spikes, error bursts, and evaluation drops; fires webhooks and surfaces in dashboard |
 | **Python SDK** | Sync + async client backed by httpx; typed exceptions; retry with backoff |
 | **TypeScript SDK** | Fetch-based client for Node.js 18+ and browsers; same types as the REST API |
 | **CLI** | `crewlayer` command — manage agents, memory, actions, and portability from the terminal |
@@ -131,6 +137,28 @@ curl -X PUT http://localhost:8000/v1/context/shared/system_prompt \
 # Read
 curl http://localhost:8000/v1/context/shared/system_prompt \
   -H "X-API-Key: crwl_..."
+```
+
+---
+
+## Dashboard
+
+CrewLayer ships a built-in web UI served at **http://localhost:8000/dashboard** (or `http://your-host/dashboard` in production).
+
+> Screenshot placeholder — coming soon.
+
+After `docker compose up -d`, the dashboard is available immediately without any additional setup. Log in with any valid API key.
+
+**Pages:** Overview · Agents · Memory · Actions · Evaluations · Prompts · Blackboard · Webhooks · Audit Log · Settings
+
+Press `Ctrl+K` / `Cmd+K` to open the command palette and navigate by keyboard.
+
+**Local development** (hot-reload against the Docker backend):
+
+```bash
+cd dashboard
+npm install
+npm run dev      # http://localhost:5173  — proxies /v1/* to localhost:8000
 ```
 
 ---
@@ -267,6 +295,32 @@ stream.close(); // when done
 | `GET` | `/v1/agents/{id}/actions` | List actions (cursor paginated) |
 | `GET` | `/v1/agents/{id}/actions/{action_id}` | Get one action |
 | `GET` | `/v1/agents/{id}/actions/stats` | Aggregate stats (total, error rate, avg duration) |
+
+### Prompts
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/v1/agents/{id}/prompts` | Create a new prompt version (auto-incremented version number) |
+| `GET` | `/v1/agents/{id}/prompts` | List all prompt versions |
+| `GET` | `/v1/agents/{id}/prompts/active` | Get the currently active version |
+| `GET` | `/v1/agents/{id}/prompts/{version_id}` | Get a specific version |
+| `POST` | `/v1/agents/{id}/prompts/{version_id}/activate` | Activate a version |
+| `POST` | `/v1/agents/{id}/prompts/rollback` | Activate the version before the current active one |
+| `GET` | `/v1/agents/{id}/prompts/diff?a=<id>&b=<id>` | Line-by-line diff between two versions |
+
+### Evaluations
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/v1/agents/{id}/actions/{action_id}/evaluate` | Submit a human rating (thumbs + score) |
+| `GET` | `/v1/agents/{id}/evaluations` | List evaluations (filter by date, prompt version) |
+| `GET` | `/v1/agents/{id}/evaluations/summary` | Aggregated metrics + 7-day trend + per-version breakdown |
+| `GET` | `/v1/agents/{id}/anomalies` | List detected anomalies (`?resolved=false` for open only) |
+| `POST` | `/v1/agents/{id}/anomalies/{anomaly_id}/resolve` | Mark anomaly as resolved |
+| `POST` | `/v1/agents/{id}/ab-tests` | Create an A/B test between two prompt versions |
+| `GET` | `/v1/agents/{id}/ab-tests` | List A/B tests |
+| `GET` | `/v1/agents/{id}/ab-tests/{test_id}/results` | Comparative metrics per variant |
+| `POST` | `/v1/agents/{id}/ab-tests/{test_id}/complete` | Declare winner and optionally activate winning version |
 
 ### Sessions
 

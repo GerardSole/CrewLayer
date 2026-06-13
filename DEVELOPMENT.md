@@ -52,6 +52,8 @@ Tests require a running PostgreSQL and Redis (use `docker compose up -d`). Each 
 
 The pub/sub and SSE-related tests (`test_context_subscribe.py`) subscribe directly to Redis channels to avoid httpx ASGI transport cleanup issues. They also require Redis to be running. The context broker in tests uses a **dedicated Redis client on DB 1** to avoid pubsub pool contention with the shared test client.
 
+CI also builds the dashboard (`npm run build` inside `dashboard/`) and verifies there are no TypeScript errors (`tsc --noEmit`). A build failure in the dashboard blocks the CI pipeline the same as a failing Python test.
+
 ```bash
 # Run a single test file
 pytest tests/test_memory.py -v
@@ -293,6 +295,54 @@ crewlayer import agent_backup.json
 crewlayer agents list --json | jq '.[].id'
 AGENT=$(crewlayer agents create --name "bot" --json | jq -r '.id')
 ```
+
+## Dashboard
+
+The dashboard is a React + Vite SPA located in `dashboard/`. It communicates with the backend via the REST API and is served at `/dashboard/` in production.
+
+### Install dependencies
+
+```bash
+cd dashboard
+npm install
+```
+
+### Run in development
+
+```bash
+npm run dev
+```
+
+Starts Vite on **http://localhost:5173**. The `vite.config.ts` proxy forwards `/v1/*` and `/health` to `http://localhost:8000`, so the FastAPI backend must be running (either locally or via Docker).
+
+Login with any valid API key. The app stores credentials in `localStorage` and sends them as `X-API-Key` on every request.
+
+**Keyboard shortcut:** `Ctrl+K` (Windows/Linux) or `Cmd+K` (macOS) opens the command palette for keyboard-driven navigation between pages.
+
+### Production build
+
+```bash
+npm run build
+# → runs: tsc && vite build --base /dashboard/
+# → output: dashboard/dist/
+```
+
+The base URL `/dashboard/` ensures all asset paths and the React Router `basename` match the FastAPI mount point. After building, copy the output to the Docker volume if the backend is running in a container:
+
+```bash
+docker compose cp dashboard/dist/. api:/app/dashboard/dist/
+```
+
+The `docker compose build` command for the `api` service runs `npm run build` automatically as part of the Dockerfile, so production images always include a fresh dashboard build.
+
+### How the dashboard is served by FastAPI
+
+`main.py` mounts the built dashboard:
+
+- `GET /dashboard/assets/*` — served directly as static files
+- `GET /dashboard/{path:path}` — SPA catch-all returns `dashboard/dist/index.html`
+
+Hard-refreshing any dashboard route (e.g. `/dashboard/agents`) works correctly because of this fallback.
 
 ## TypeScript SDK
 
