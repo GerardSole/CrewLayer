@@ -18,6 +18,8 @@ import {
 } from 'lucide-react'
 import { MemoryTab } from './MemoryTab'
 import { ActionsTab } from './ActionsTab'
+import { EvaluationsTab } from './EvaluationsTab'
+import { PromptsTab } from './PromptsTab'
 import {
   LineChart,
   Line,
@@ -731,10 +733,10 @@ export default function AgentDetailPage() {
             <ActionsTab agentId={agentId!} />
           </TabsContent>
           <TabsContent value="evaluations">
-            <StubTab icon={BarChart} title="Evaluations" prompt="Prompt 5" />
+            <EvaluationsTab agentId={agentId!} />
           </TabsContent>
           <TabsContent value="prompts">
-            <StubTab icon={FileText} title="Prompts" prompt="Prompt 5" />
+            <PromptsTab agentId={agentId!} />
           </TabsContent>
         </div>
       </Tabs>

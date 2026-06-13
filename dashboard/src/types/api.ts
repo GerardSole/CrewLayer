@@ -362,6 +362,60 @@ export interface Evaluation {
   created_by?: string
 }
 
+// ── A/B Tests ────────────────────────────────────────────────────────────────
+export type ABTestStatus = 'active' | 'completed' | 'cancelled'
+export type ABTestWinner = 'a' | 'b' | 'inconclusive'
+
+export interface ABTest {
+  id: string
+  tenant_id: string
+  agent_id: string
+  name: string
+  status: ABTestStatus
+  variant_a_prompt_version_id: string
+  variant_b_prompt_version_id: string
+  traffic_split: number
+  started_at: string
+  completed_at?: string
+  winner?: ABTestWinner | null
+}
+
+export interface ABTestListResponse {
+  items: ABTest[]
+  count: number
+}
+
+export interface VariantResults {
+  variant: string
+  prompt_version_id: string
+  total_actions: number
+  error_rate: number
+  avg_score?: number | null
+  thumbs_up_ratio: number
+}
+
+export interface ABTestResults {
+  ab_test_id: string
+  name: string
+  status: string
+  variant_a: VariantResults
+  variant_b: VariantResults
+}
+
+// ── Prompt Diff ───────────────────────────────────────────────────────────────
+export interface DiffLine {
+  operation: 'equal' | 'insert' | 'delete'
+  content: string
+  line_a?: number | null
+  line_b?: number | null
+}
+
+export interface PromptDiffResponse {
+  version_id_a: string
+  version_id_b: string
+  lines: DiffLine[]
+}
+
 // ── Usage ────────────────────────────────────────────────────────────────────
 export interface UsageStats {
   requests_today: number

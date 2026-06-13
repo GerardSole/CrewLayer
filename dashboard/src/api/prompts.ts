@@ -1,5 +1,5 @@
 import { getClient } from './client'
-import type { PromptVersion } from '@/types/api'
+import type { PromptVersion, PromptDiffResponse } from '@/types/api'
 
 export async function listPromptVersions(
   agentId: string,
@@ -34,6 +34,25 @@ export async function activatePromptVersion(
 ): Promise<PromptVersion> {
   const { data } = await getClient().post<PromptVersion>(
     `/v1/agents/${agentId}/prompts/${versionId}/activate`,
+  )
+  return data
+}
+
+export async function rollbackPrompt(agentId: string): Promise<PromptVersion> {
+  const { data } = await getClient().post<PromptVersion>(
+    `/v1/agents/${agentId}/prompts/rollback`,
+  )
+  return data
+}
+
+export async function diffPromptVersions(
+  agentId: string,
+  a: string,
+  b: string,
+): Promise<PromptDiffResponse> {
+  const { data } = await getClient().get<PromptDiffResponse>(
+    `/v1/agents/${agentId}/prompts/diff`,
+    { params: { a, b } },
   )
   return data
 }
