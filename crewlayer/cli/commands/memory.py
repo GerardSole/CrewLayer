@@ -6,7 +6,6 @@ import typer
 from rich.console import Console
 from rich.rule import Rule
 from rich.table import Table
-from rich.text import Text
 
 from crewlayer.cli import client as _client
 

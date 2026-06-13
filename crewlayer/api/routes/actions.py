@@ -4,9 +4,9 @@ from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
-from sse_starlette.sse import EventSourceResponse  # type: ignore[attr-defined]
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sse_starlette.sse import EventSourceResponse  # type: ignore[attr-defined]
 
 from crewlayer.api.deps import DbDep, RedisDep, TenantDep, check_scope
 from crewlayer.api.schemas.actions import (
@@ -21,15 +21,15 @@ from crewlayer.api.schemas.actions import (
 )
 from crewlayer.core.actions.alerts import check_and_fire_alerts
 from crewlayer.core.actions.logger import ActionFilters, ActionLogger
-from crewlayer.core.evaluation.anomalies import AnomalyManager
-from crewlayer.core.webhooks.dispatcher import dispatch
-from crewlayer.db.models import Action as _BGAction
 from crewlayer.core.actions.replay import (
     create_replay,
     get_replay,
     list_replays,
     replay_event_stream,
 )
+from crewlayer.core.evaluation.anomalies import AnomalyManager
+from crewlayer.core.webhooks.dispatcher import dispatch
+from crewlayer.db.models import Action as _BGAction
 from crewlayer.db.models import (
     ActionStatus,
     Agent,
@@ -39,6 +39,7 @@ from crewlayer.db.models import (
     Session,
     SessionStatus,
 )
+
 router = APIRouter()
 
 
@@ -52,11 +53,13 @@ async def _detect_anomalies_bg(
 
     Uses NullPool so this task never reuses connections across event-loop boundaries.
     """
-    import logging as _logging
     import contextlib
+    import logging as _logging
+
     import redis.asyncio as aioredis
-    from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
     from sqlalchemy.pool import NullPool
+
     from crewlayer.core.config import settings as _settings
     _log = _logging.getLogger(__name__)
 

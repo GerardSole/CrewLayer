@@ -112,7 +112,7 @@ async def stream_session(
 
                 try:
                     raw = await asyncio.wait_for(queue.get(), timeout=_HEARTBEAT_INTERVAL)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     # Client still connected; emit keepalive
                     if await request.is_disconnected():
                         break

@@ -17,7 +17,6 @@ from crewlayer.core.agents.relations import (
     AgentRelations,
     CycleError,
     DuplicateSupervisorError,
-    RelationNotFoundError,
     SelfRelationError,
 )
 from crewlayer.core.agents.status import (

@@ -27,7 +27,6 @@ Two entry points:
 """
 from __future__ import annotations
 
-from contextlib import suppress
 from datetime import UTC, datetime, timedelta
 from typing import Any
 

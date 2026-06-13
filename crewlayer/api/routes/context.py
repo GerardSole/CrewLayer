@@ -16,7 +16,6 @@ from fastapi import APIRouter, HTTPException, Query, Request, status
 from sse_starlette.sse import EventSourceResponse, ServerSentEvent  # type: ignore[attr-defined]
 
 from crewlayer.api.deps import ContextBrokerDep, DbDep, RedisDep, TenantDep, check_scope
-from crewlayer.core.agents.relations import AgentRelations
 from crewlayer.api.schemas.context import (
     ContextEntryResponse,
     ContextHistoryEntry,
@@ -26,6 +25,7 @@ from crewlayer.api.schemas.context import (
     RollbackRequest,
     RollbackResponse,
 )
+from crewlayer.core.agents.relations import AgentRelations
 from crewlayer.core.context.blackboard import (
     Blackboard,
     RollbackToDeletionError,
@@ -80,7 +80,7 @@ def _sse_generator(
                 while True:
                     try:
                         raw = await asyncio.wait_for(q.get(), timeout=_DISCONNECT_CHECK)
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         if await request.is_disconnected():
                             break
                         now = loop.time()
@@ -100,7 +100,7 @@ def _sse_generator(
                     event_type = str(parsed.get("event", "updated"))
                     yield ServerSentEvent(event=event_type, data=raw)
 
-        except (asyncio.TimeoutError, TimeoutError):
+        except TimeoutError:
             yield ServerSentEvent(
                 event="timeout",
                 data=json.dumps({"reason": "max_duration_reached"}),

@@ -1,10 +1,10 @@
 """Replay engine — replays a recorded action sequence as a live SSE stream."""
 import asyncio
 import json
+import uuid
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from datetime import UTC, datetime
 from typing import Any
-import uuid
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession

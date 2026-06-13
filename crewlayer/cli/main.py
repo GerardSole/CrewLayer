@@ -4,7 +4,7 @@ Install:  pip install crewlayer[cli]
 Run:      crewlayer --help
 """
 import json
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 from rich.console import Console

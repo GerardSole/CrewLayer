@@ -7,13 +7,25 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from crewlayer.api.deps import DbDep, RedisDep, TenantDep, check_scope
-from crewlayer.api.schemas.sessions import ActivePromptInfo, SessionCloseResponse, SessionCreate, SessionResponse, SessionUpdate
+from crewlayer.api.schemas.sessions import (
+    ActivePromptInfo,
+    SessionCloseResponse,
+    SessionCreate,
+    SessionResponse,
+    SessionUpdate,
+)
 from crewlayer.core.agents.status import cache_status
 from crewlayer.core.evaluation.abtesting import ABTestManager
-from crewlayer.core.memory.episodic import EpisodeNotFoundError, EpisodicMemory, SessionNotFoundError as EpisodicSessionNotFoundError
+from crewlayer.core.memory.episodic import EpisodeNotFoundError, EpisodicMemory
+from crewlayer.core.memory.episodic import SessionNotFoundError as EpisodicSessionNotFoundError
 from crewlayer.core.memory.short import ShortMemory
-from crewlayer.core.sessions.manager import SessionManager, SessionNotActiveError, SessionNotFoundError
-from crewlayer.core.streaming.broker import make_channel, publish as stream_publish
+from crewlayer.core.sessions.manager import (
+    SessionManager,
+    SessionNotActiveError,
+    SessionNotFoundError,
+)
+from crewlayer.core.streaming.broker import make_channel
+from crewlayer.core.streaming.broker import publish as stream_publish
 from crewlayer.core.webhooks.dispatcher import dispatch
 from crewlayer.db.models import Agent, AgentStatusEnum, Memory, SessionStatus
 
@@ -162,7 +174,8 @@ async def close_session(
     await db.commit()
     await db.refresh(sess)
 
-    from datetime import UTC, datetime as _dt
+    from datetime import UTC
+    from datetime import datetime as _dt
     await cache_status(agent_id_for_session, AgentStatusEnum.idle, None, sess.closed_at or _dt.now(UTC), redis)
 
     sm = ShortMemory(redis)
@@ -170,7 +183,7 @@ async def close_session(
 
     # Count how many memories were extracted for this session
     from sqlalchemy import func
-    result = await db.execute(
+    await db.execute(
         select(func.count()).select_from(Memory).where(
             Memory.tenant_id == tenant.id,
             Memory.agent_id == sess.agent_id,

@@ -1,6 +1,6 @@
 """crewlayer actions ..."""
 import json
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 from rich.console import Console
@@ -18,11 +18,11 @@ _STATUS_COLOR = {"success": "green", "error": "red", "pending": "yellow"}
 def list_actions(
     agent_id: Annotated[str, typer.Argument(help="Agent UUID")],
     status: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--status", help="Filter by status (success/error/pending)"),
     ] = None,
     tool: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--tool", help="Filter by tool name"),
     ] = None,
     limit: Annotated[int, typer.Option("--limit", "-n")] = 20,

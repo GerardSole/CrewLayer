@@ -17,7 +17,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import crewlayer.core.actions.replay as replay_mod
 from crewlayer.db.models import Action, ActionStatus, Replay
 
-
 # ─── helpers ─────────────────────────────────────────────────────────────────
 
 async def _setup(client: AsyncClient) -> tuple[dict, dict, dict]:
@@ -197,8 +196,7 @@ async def test_tenant_isolation_cannot_access_other_tenant_replay(client: AsyncC
     # Tenant B tries to access tenant A's replay
     r_b = await client.post("/v1/tenants", json={"name": "tenant-b"})
     hdrs_b = {"X-API-Key": r_b.json()["initial_api_key"]}
-    r_b_agent = await client.post("/v1/agents", json={"name": "b-agent"}, headers=hdrs_b)
-    b_agent_id = r_b_agent.json()["id"]
+    await client.post("/v1/agents", json={"name": "b-agent"}, headers=hdrs_b)
 
     # B cannot GET from A's agent
     resp = await client.get(f"/v1/agents/{agent_a['id']}/replays/{rid}", headers=hdrs_b)

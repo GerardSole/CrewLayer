@@ -29,8 +29,8 @@ if not API_KEY or not AGENT_ID:
     sys.exit("ERROR: Set CREWLAYER_API_KEY and CREWLAYER_AGENT_ID environment variables.")
 
 try:
-    from llama_index.core.schema import Document
     from crewlayer.integrations.llamaindex import CrewLayerVectorIndex
+    from llama_index.core.schema import Document
 except ImportError:
     sys.exit("ERROR: Run: pip install crewlayer[llamaindex] llama-index-core")
 

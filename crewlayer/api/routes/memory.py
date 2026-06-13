@@ -7,7 +7,6 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from crewlayer.api.deps import DbDep, RedisDep, TenantDep, check_scope
-from crewlayer.core.webhooks.dispatcher import dispatch
 from crewlayer.api.schemas.memory import (
     ArchiveRequest,
     ArchiveResponse,
@@ -28,7 +27,9 @@ from crewlayer.api.schemas.memory import (
 from crewlayer.core.memory.extractor import extract_and_save
 from crewlayer.core.memory.long import LongMemory
 from crewlayer.core.memory.short import ShortMemory
-from crewlayer.core.streaming.broker import make_channel, publish as stream_publish
+from crewlayer.core.streaming.broker import make_channel
+from crewlayer.core.streaming.broker import publish as stream_publish
+from crewlayer.core.webhooks.dispatcher import dispatch
 from crewlayer.db.models import Agent, Memory, MemoryStatusEnum, Session, SessionStatus
 
 router = APIRouter()

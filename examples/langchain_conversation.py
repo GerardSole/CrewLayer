@@ -17,8 +17,9 @@ Run:
 import os
 import sys
 
-from crewlayer import CrewLayerClient
 from crewlayer.integrations.langchain import CrewLayerCallbackHandler, CrewLayerMemory
+
+from crewlayer import CrewLayerClient
 
 API_KEY   = os.environ.get("CREWLAYER_API_KEY", "")
 BASE_URL  = os.environ.get("CREWLAYER_URL", "http://localhost:8000")

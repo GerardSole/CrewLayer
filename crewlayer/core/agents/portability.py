@@ -3,7 +3,6 @@
 Export streams data section-by-section (memories and actions use server-side cursors).
 Import runs in a single savepoint for atomicity; embeddings are regenerated in background.
 """
-import asyncio
 import json
 import uuid
 from collections.abc import AsyncGenerator
@@ -11,7 +10,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from pydantic import BaseModel, field_validator
-from sqlalchemy import or_, select, update
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from crewlayer.core.embeddings.client import get_embedding

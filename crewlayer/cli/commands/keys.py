@@ -1,6 +1,6 @@
 """crewlayer keys ..."""
 import json
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 from rich.console import Console
@@ -17,7 +17,7 @@ console = Console()
 def create(
     name: Annotated[str, typer.Option("--name", help="Key name / label")],
     scopes: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--scopes", help="Comma-separated scopes, e.g. memory:read,memory:write"),
     ] = None,
     as_json: Annotated[bool, typer.Option("--json", help="Output raw JSON")] = False,

@@ -3,13 +3,12 @@ import time
 import uuid
 
 import pytest
-import pytest_asyncio
 from httpx import AsyncClient
 from redis.asyncio import Redis
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from crewlayer.core.ratelimit.limiter import PLAN_LIMITS, SlidingWindowLimiter
+from crewlayer.core.ratelimit.limiter import PLAN_LIMITS
 from crewlayer.db.models import PlanEnum, Tenant
 
 pytestmark = pytest.mark.asyncio

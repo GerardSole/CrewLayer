@@ -7,7 +7,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from crewlayer.core.embeddings.client import get_embedding
-from crewlayer.db.models import Episode, EpisodeMemory, EpisodeStatusEnum, Memory, MemoryStatusEnum, Session
+from crewlayer.db.models import (
+    Episode,
+    EpisodeMemory,
+    EpisodeStatusEnum,
+    Memory,
+    MemoryStatusEnum,
+    Session,
+)
 
 # Module-level client so tests can patch crewlayer.core.memory.episodic._client
 _client = anthropic.AsyncAnthropic()

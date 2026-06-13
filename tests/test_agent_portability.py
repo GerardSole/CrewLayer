@@ -1,5 +1,4 @@
 """Agent export/import portability tests."""
-import json
 import uuid
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock
@@ -343,13 +342,11 @@ async def test_import_preserves_episodes_and_links(
     tenant, headers = await _setup(client)
     agent = await _create_agent(client, headers)
 
-    ep_r = await client.post(
+    await client.post(
         f"/v1/agents/{agent['id']}/episodes",
         json={"title": "Exported Episode"},
         headers=headers,
     )
-    ep_id = ep_r.json()["id"]
-
     export_r = await client.get(f"/v1/agents/{agent['id']}/export", headers=headers)
     import_r = await client.post("/v1/agents/import", json=export_r.json(), headers=headers)
     assert import_r.status_code == 201

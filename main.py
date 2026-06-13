@@ -20,19 +20,21 @@ from crewlayer.api.routes import (
     episodes,
     evaluations,
     memory,
-    metrics as metrics_route,
     prompts,
     sessions,
     streaming,
     usage,
     webhooks,
 )
+from crewlayer.api.routes import (
+    metrics as metrics_route,
+)
 from crewlayer.core.config import settings
 from crewlayer.core.context.blackboard import cleanup_expired
-from crewlayer.core.telemetry.setup import setup_telemetry
 from crewlayer.core.memory.decay import decay_importance, forget_stale_memories
 from crewlayer.core.metrics.collectors import collect_metrics
 from crewlayer.core.streaming.context_broker import ContextBroker
+from crewlayer.core.telemetry.setup import setup_telemetry
 from crewlayer.db.session import AsyncSessionLocal
 
 _CLEANUP_INTERVAL = 60       # seconds

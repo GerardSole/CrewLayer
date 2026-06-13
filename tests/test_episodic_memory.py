@@ -1,13 +1,13 @@
 """Episodic memory tests: create/list/detail, session linking, complete (AI summary), recall."""
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from crewlayer.db.models import Episode, EpisodeMemory, Memory, Session
+from crewlayer.db.models import EpisodeMemory, Memory
 
 pytestmark = pytest.mark.asyncio
 
@@ -128,7 +128,7 @@ async def test_list_episodes_filter_by_status(client: AsyncClient, mocker: pytes
     _, headers = await _setup(client)
     agent = await _create_agent(client, headers)
 
-    ep1 = await _create_episode(client, headers, agent["id"], title="active-ep")
+    await _create_episode(client, headers, agent["id"], title="active-ep")
     ep2 = await _create_episode(client, headers, agent["id"], title="done-ep")
 
     await client.post(f"/v1/agents/{agent['id']}/episodes/{ep2['id']}/complete", headers=headers)

@@ -167,7 +167,7 @@ async def test_hard_delete_skips_disabled_tenant(
     await db.flush()
     mem_id = mem.id
 
-    result = await forget_stale_memories(db, now=_NOW)
+    await forget_stale_memories(db, now=_NOW)
 
     row = (await db.execute(select(Memory).where(Memory.id == mem_id))).scalar_one_or_none()
     assert row is not None
@@ -229,7 +229,7 @@ async def test_archive_respects_tenant_days(
     await db.flush()
     mem_id = mem.id
 
-    result = await forget_stale_memories(db, now=_NOW)
+    await forget_stale_memories(db, now=_NOW)
 
     row = (await db.execute(select(Memory).where(Memory.id == mem_id))).scalar_one_or_none()
     assert row is not None
@@ -255,7 +255,6 @@ async def test_decay_unaccessed_reduces_importance(
     )
     db.add(mem)
     await db.flush()
-    mem_id = mem.id
 
     result = await forget_stale_memories(db, now=_NOW)
 

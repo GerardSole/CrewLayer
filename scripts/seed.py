@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from crewlayer.core.config import settings
 from crewlayer.core.security import hash_key
-from crewlayer.db.models import ApiKey, Base, Tenant
+from crewlayer.db.models import ApiKey, Tenant
 
 
 def _generate_key(key_id: uuid.UUID) -> str:

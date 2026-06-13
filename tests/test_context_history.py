@@ -3,10 +3,7 @@ import uuid
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from crewlayer.db.models import ContextHistory, ContextOperationEnum
 
 pytestmark = pytest.mark.asyncio
 

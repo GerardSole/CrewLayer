@@ -100,7 +100,7 @@ for i in range(3):
 print("  ✓ 3 error actions logged")
 
 # ── Step 6: Rollback to version 1 ─────────────────────────────────────────────
-print(f"\n[6] Rolling back to the previous version...")
+print("\n[6] Rolling back to the previous version...")
 rolled_back = client.prompts.rollback(AGENT_ID)
 print(f"  ✓ Rolled back to version {rolled_back.version}: '{rolled_back.description}'")
 

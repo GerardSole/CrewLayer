@@ -392,8 +392,9 @@ async def test_complete_nonexistent_ab_test_returns_404(client: AsyncClient) -> 
 
 async def test_deterministic_variant_assignment(client: AsyncClient) -> None:
     """Same session_id must always get the same variant across sessions."""
-    from crewlayer.core.evaluation.abtesting import ABTestManager as _Mgr
     import hashlib
+
+    from crewlayer.core.evaluation.abtesting import ABTestManager as _Mgr
 
     session_id = uuid.uuid4()
     traffic_split = 0.5
@@ -403,7 +404,6 @@ async def test_deterministic_variant_assignment(client: AsyncClient) -> None:
     bucket = int.from_bytes(digest[:4], "big") % 100
     expected = "a" if bucket < traffic_split * 100 else "b"
 
-    from crewlayer.db.models import ABTestVariantEnum
     variant = _Mgr._deterministic_variant(session_id, traffic_split)
     assert variant.value == expected
 

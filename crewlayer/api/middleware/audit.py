@@ -12,9 +12,7 @@ import asyncio
 import contextlib
 import re
 import uuid
-from collections.abc import Callable, Coroutine
 from datetime import UTC, datetime
-from typing import Any
 
 from starlette.requests import Request
 from starlette.types import ASGIApp, Message, Receive, Scope, Send

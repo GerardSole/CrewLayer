@@ -1,6 +1,6 @@
 """crewlayer agents ..."""
 import json
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 from rich.console import Console
@@ -17,11 +17,11 @@ _STATUS_COLOR = {"idle": "green", "working": "yellow", "error": "red"}
 @app.command("list")
 def list_agents(
     tags: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--tags", help="Filter by tags (comma-separated, AND logic)"),
     ] = None,
     status: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--status", help="Filter by status (idle/working/error)"),
     ] = None,
     as_json: Annotated[bool, typer.Option("--json", help="Output raw JSON")] = False,
@@ -67,9 +67,9 @@ def list_agents(
 @app.command("create")
 def create(
     name: Annotated[str, typer.Option("--name", help="Agent name")],
-    description: Annotated[Optional[str], typer.Option("--description")] = None,
+    description: Annotated[str | None, typer.Option("--description")] = None,
     tags: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--tags", help="Comma-separated tags"),
     ] = None,
     as_json: Annotated[bool, typer.Option("--json", help="Output raw JSON")] = False,

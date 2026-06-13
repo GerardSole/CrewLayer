@@ -4,16 +4,15 @@ import hashlib
 import hmac
 import json
 import uuid
+from unittest.mock import AsyncMock
 
 import pytest
-import pytest_asyncio
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from unittest.mock import AsyncMock
 
 from crewlayer.core.webhooks.dispatcher import dispatch
-from crewlayer.db.models import DeliveryStatus, WebhookDelivery, WebhookEndpoint
+from crewlayer.db.models import DeliveryStatus, WebhookDelivery
 
 pytestmark = pytest.mark.asyncio
 
