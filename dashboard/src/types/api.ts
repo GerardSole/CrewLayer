@@ -230,6 +230,19 @@ export interface AnomalyListResponse {
   count: number
 }
 
+// ── Agent extras ─────────────────────────────────────────────────────────────
+export interface AgentStatusResponse {
+  agent_id: string
+  status: AgentStatus
+  current_session_id?: string | null
+  updated_at: string
+}
+
+export interface TagCount {
+  tag: string
+  count: number
+}
+
 // ── Usage ────────────────────────────────────────────────────────────────────
 export interface UsageStats {
   requests_today: number
