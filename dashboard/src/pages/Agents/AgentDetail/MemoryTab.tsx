@@ -31,6 +31,7 @@ import { listSessions } from '@/api/sessions'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -103,6 +104,9 @@ function AddMemoryDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Add Memory</DialogTitle>
+          <DialogDescription>
+            Save a new long-term memory for this agent. It will be embedded and deduplicated automatically.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">

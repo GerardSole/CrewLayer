@@ -12,6 +12,7 @@ from crewlayer.api.schemas.memory import (
     ArchiveResponse,
     ExtractRequest,
     ExtractResponse,
+    MemoryCreateRequest,
     MemoryHistoryEntry,
     MemoryHistoryResponse,
     MemoryListResponse,
@@ -305,6 +306,42 @@ async def force_archive(
 
     await db.commit()
     return ArchiveResponse(archived_count=len(rows))
+
+
+@router.post(
+    "/agents/{agent_id}/memory",
+    status_code=status.HTTP_201_CREATED,
+    response_model=MemoryResponse,
+    dependencies=[check_scope("memory:write")],
+)
+async def create_memory(
+    agent_id: uuid.UUID,
+    body: MemoryCreateRequest,
+    tenant: TenantDep,
+    db: DbDep,
+    redis: RedisDep,
+) -> MemoryResponse:
+    """Directly save a long-term memory for an agent.
+
+    The content is embedded and deduplicated against existing memories.
+    If a near-duplicate is found, Claude merges the two and soft-deletes the original.
+    """
+    await _get_agent(agent_id, tenant.id, db)
+    lm = LongMemory(db, redis)
+    mem = await lm.save(
+        tenant.id,
+        agent_id,
+        body.content,
+        importance=body.importance,
+        tags=body.tags or None,
+        summary=body.summary,
+    )
+    await db.commit()
+    await db.refresh(mem)
+    asyncio.create_task(
+        dispatch(tenant.id, "memory.created", {"agent_id": str(agent_id), "memory_id": str(mem.id)})
+    )
+    return MemoryResponse.model_validate(mem)
 
 
 @router.get(

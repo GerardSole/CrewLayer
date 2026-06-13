@@ -117,3 +117,10 @@ class ArchiveRequest(BaseModel):
 
 class ArchiveResponse(BaseModel):
     archived_count: int
+
+
+class MemoryCreateRequest(BaseModel):
+    content: str
+    importance: float = Field(default=0.5, ge=0.0, le=1.0)
+    tags: list[str] = Field(default_factory=list)
+    summary: str | None = None

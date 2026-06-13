@@ -3,6 +3,8 @@ import type { AuditLogResponse } from '@/types/api'
 
 export async function listAuditLog(params?: {
   resource_type?: string
+  from?: string
+  to?: string
   limit?: number
   cursor?: string
 }): Promise<AuditLogResponse> {

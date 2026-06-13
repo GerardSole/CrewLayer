@@ -1,5 +1,6 @@
 import hashlib
 import json
+import logging
 from typing import Any
 
 import httpx
@@ -8,6 +9,7 @@ from crewlayer.core.config import settings
 
 EMBEDDING_DIM = 1536
 _CACHE_TTL = 86400  # 24 hours
+_log = logging.getLogger(__name__)
 
 
 async def get_embedding(text: str, redis: Any = None) -> list[float]:
@@ -15,6 +17,7 @@ async def get_embedding(text: str, redis: Any = None) -> list[float]:
 
     Results are cached in Redis under key emb:{sha256[:16]} for 24 hours.
     Pass redis=None to skip the cache.
+    Falls back to a zero vector if the embedding provider is unavailable.
     """
     cache_key = f"emb:{hashlib.sha256(text.encode()).hexdigest()[:16]}"
 
@@ -23,10 +26,14 @@ async def get_embedding(text: str, redis: Any = None) -> list[float]:
         if cached is not None:
             return json.loads(cached)  # type: ignore[no-any-return]
 
-    if settings.EMBEDDING_PROVIDER == "local":
-        vector = await _embed_local(text)
-    else:
-        vector = await _embed_voyage(text)
+    try:
+        if settings.EMBEDDING_PROVIDER == "local":
+            vector = await _embed_local(text)
+        else:
+            vector = await _embed_voyage(text)
+    except Exception as exc:
+        _log.warning("Embedding provider unavailable (%s); storing memory without vector.", exc)
+        return [0.0] * EMBEDDING_DIM
 
     # Normalise to exactly EMBEDDING_DIM
     if len(vector) < EMBEDDING_DIM:

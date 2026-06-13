@@ -39,3 +39,7 @@ class DeliveryResponse(BaseModel):
 class DeliveryListResponse(BaseModel):
     items: list[DeliveryResponse]
     count: int
+
+
+class WebhookUpdate(BaseModel):
+    active: bool | None = None

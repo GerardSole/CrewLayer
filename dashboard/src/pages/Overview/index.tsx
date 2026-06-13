@@ -218,8 +218,9 @@ export default function OverviewPage() {
       total += q.data.total_actions
       weightedErr += q.data.error_rate * q.data.total_actions
       totalWeight += q.data.total_actions
-      q.data.by_tool.forEach((t) => {
-        toolMap[t.tool_name] = (toolMap[t.tool_name] ?? 0) + t.count
+      q.data.by_tool?.forEach((t) => {
+        if (!t) return
+        toolMap[t.tool_name] = (toolMap[t.tool_name] ?? 0) + (t.count ?? 0)
       })
     })
 

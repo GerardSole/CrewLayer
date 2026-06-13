@@ -727,7 +727,7 @@ function ActionStatsBar({ agentId }: { agentId: string }) {
 
   const { data: recent7d } = useQuery({
     queryKey: ['actions-7d', agentId],
-    queryFn: () => listActions(agentId, { since: since7d, limit: 500 }),
+    queryFn: () => listActions(agentId, { since: since7d, limit: 100 }),
     staleTime: 60_000,
     retry: false,
   })

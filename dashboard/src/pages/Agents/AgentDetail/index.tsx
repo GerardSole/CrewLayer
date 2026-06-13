@@ -347,7 +347,7 @@ function AgentOverviewTab({ agentId }: { agentId: string }) {
 
   const { data: recentActions } = useQuery({
     queryKey: ['agent-actions-30d', agentId],
-    queryFn: () => listActions(agentId, { since: since30d, limit: 500 }),
+    queryFn: () => listActions(agentId, { since: since30d, limit: 100 }),
     staleTime: 60_000,
     retry: false,
   })
@@ -484,26 +484,27 @@ function AgentOverviewTab({ agentId }: { agentId: string }) {
       </div>
 
       {/* Top tools */}
-      {stats && stats.by_tool.length > 0 && (
+      {stats && (stats.by_tool?.length ?? 0) > 0 && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium">By Tool</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {stats.by_tool
-                .sort((a, b) => b.count - a.count)
+              {(stats.by_tool ?? [])
+                .sort((a, b) => (b?.count ?? 0) - (a?.count ?? 0))
                 .slice(0, 5)
                 .map((t) => {
+                  if (!t) return null
                   const pct = stats.total_actions > 0
-                    ? (t.count / stats.total_actions) * 100
+                    ? ((t.count ?? 0) / stats.total_actions) * 100
                     : 0
                   return (
                     <div key={t.tool_name} className="space-y-1">
                       <div className="flex items-center justify-between text-xs">
                         <span className="font-mono">{t.tool_name}</span>
                         <span className="text-muted-foreground">
-                          {formatNumber(t.count)} calls ·{' '}
+                          {formatNumber(t.count ?? 0)} calls ·{' '}
                           {(t.error_rate * 100).toFixed(0)}% err
                           {t.avg_duration_ms != null && (
                             <> · {formatDuration(t.avg_duration_ms)}</>

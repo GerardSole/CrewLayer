@@ -152,9 +152,24 @@ export interface WebhookEndpoint {
   id: string
   url: string
   events: string[]
-  is_active: boolean
+  active: boolean
   created_at: string
-  last_triggered_at?: string
+}
+
+export interface WebhookDelivery {
+  id: string
+  webhook_id: string
+  event: string
+  payload: Record<string, unknown>
+  status: string
+  attempts: number
+  last_attempt_at?: string
+  response_status?: number
+}
+
+export interface DeliveryListResponse {
+  items: WebhookDelivery[]
+  count: number
 }
 
 // GET /v1/webhooks returns a plain array
@@ -168,6 +183,10 @@ export interface ApiKey {
   agent_ids: string[]
   last_used_at?: string
   expires_at?: string
+}
+
+export interface ApiKeyCreated extends ApiKey {
+  key: string
 }
 
 // GET /v1/api-keys returns a plain array

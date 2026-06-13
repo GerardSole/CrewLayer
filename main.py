@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 import redis.asyncio as aioredis
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from prometheus_fastapi_instrumentator import Instrumentator
 
@@ -173,8 +173,20 @@ async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-# Mount the built dashboard as static files at /dashboard.
-# The dashboard/ directory is built via `npm run build` inside dashboard/.
+# ── Dashboard SPA ──────────────────────────────────────────────────────────────
 _DASHBOARD_DIR = pathlib.Path(__file__).parent / "dashboard" / "dist"
+
 if _DASHBOARD_DIR.is_dir():
-    app.mount("/dashboard", StaticFiles(directory=_DASHBOARD_DIR, html=True), name="dashboard")
+    # Serve compiled assets (JS/CSS) as plain static files.
+    _assets_dir = _DASHBOARD_DIR / "assets"
+    if _assets_dir.is_dir():
+        app.mount("/dashboard/assets", StaticFiles(directory=_assets_dir), name="dashboard-assets")
+
+    # SPA catch-all: any /dashboard/* path that is not a real file gets index.html.
+    # This makes hard-refreshing on /dashboard/overview, /dashboard/agents/… work.
+    @app.get("/dashboard/{full_path:path}", include_in_schema=False)
+    async def dashboard_spa(full_path: str) -> FileResponse:
+        file = _DASHBOARD_DIR / full_path
+        if file.is_file():
+            return FileResponse(file)
+        return FileResponse(_DASHBOARD_DIR / "index.html")

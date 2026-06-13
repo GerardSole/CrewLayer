@@ -20,32 +20,38 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
-export const router = createBrowserRouter([
-  {
-    path: '/login',
-    element: <LoginPage />,
-  },
-  {
-    path: '/',
-    element: (
-      <RequireAuth>
-        <Layout />
-      </RequireAuth>
-    ),
-    children: [
-      { index: true, element: <Navigate to="/overview" replace /> },
-      { path: 'overview', element: <OverviewPage /> },
-      { path: 'agents', element: <AgentsPage /> },
-      { path: 'agents/:id', element: <AgentDetailPage /> },
-      { path: 'memory', element: <MemoryPage /> },
-      { path: 'actions', element: <ActionsPage /> },
-      { path: 'evaluations', element: <EvaluationsPage /> },
-      { path: 'prompts', element: <PromptsPage /> },
-      { path: 'blackboard', element: <BlackboardPage /> },
-      { path: 'webhooks', element: <WebhooksPage /> },
-      { path: 'audit', element: <AuditLogPage /> },
-      { path: 'settings', element: <SettingsPage /> },
-    ],
-  },
-  { path: '*', element: <Navigate to="/" replace /> },
-])
+// In dev (Vite), BASE_URL is "/". In the production build (--base /dashboard/),
+// BASE_URL is "/dashboard/" — React Router uses it as the basename so that
+// hard-refreshing any sub-page works correctly when served by FastAPI.
+export const router = createBrowserRouter(
+  [
+    {
+      path: '/login',
+      element: <LoginPage />,
+    },
+    {
+      path: '/',
+      element: (
+        <RequireAuth>
+          <Layout />
+        </RequireAuth>
+      ),
+      children: [
+        { index: true, element: <Navigate to="/overview" replace /> },
+        { path: 'overview', element: <OverviewPage /> },
+        { path: 'agents', element: <AgentsPage /> },
+        { path: 'agents/:id', element: <AgentDetailPage /> },
+        { path: 'memory', element: <MemoryPage /> },
+        { path: 'actions', element: <ActionsPage /> },
+        { path: 'evaluations', element: <EvaluationsPage /> },
+        { path: 'prompts', element: <PromptsPage /> },
+        { path: 'blackboard', element: <BlackboardPage /> },
+        { path: 'webhooks', element: <WebhooksPage /> },
+        { path: 'audit', element: <AuditLogPage /> },
+        { path: 'settings', element: <SettingsPage /> },
+      ],
+    },
+    { path: '*', element: <Navigate to="/" replace /> },
+  ],
+  { basename: import.meta.env.BASE_URL },
+)

@@ -688,7 +688,7 @@ export default function BlackboardPage() {
           <div className="px-3 py-2 border-b border-border">
             <p className="text-xs text-muted-foreground">
               <code className="font-mono">{namespace}</code>
-              {data && ` · ${data.count} key${data.count !== 1 ? 's' : ''}`}
+              {data && ` · ${data.count ?? 0} key${(data.count ?? 0) !== 1 ? 's' : ''}`}
             </p>
           </div>
 

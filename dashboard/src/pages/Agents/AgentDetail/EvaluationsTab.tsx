@@ -38,7 +38,7 @@ import {
   completeABTest,
 } from '@/api/evaluations'
 import { listPromptVersions } from '@/api/prompts'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -173,6 +173,7 @@ function CompleteTestModal({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Complete A/B Test</DialogTitle>
+          <DialogDescription>Choose a winner to finalize this experiment.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">Select the winning variant or mark as inconclusive. If a winner is chosen, that prompt version will be activated.</p>
@@ -248,6 +249,7 @@ function NewABTestModal({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>New A/B Test</DialogTitle>
+          <DialogDescription>Compare two prompt versions by splitting traffic between them.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-1.5">
@@ -436,7 +438,7 @@ export function EvaluationsTab({ agentId }: { agentId: string }) {
 
   const { data: evals30 } = useQuery({
     queryKey: ['evals-30d', agentId],
-    queryFn: () => listEvaluations(agentId, { from_date: since30, limit: 500 }),
+    queryFn: () => listEvaluations(agentId, { from_date: since30, limit: 100 }),
     staleTime: 60_000,
     retry: false,
   })
@@ -611,7 +613,7 @@ export function EvaluationsTab({ agentId }: { agentId: string }) {
                     <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">
                       {v.prompt_version_id ? v.prompt_version_id.slice(0, 8) + '…' : 'unlinked'}
                     </td>
-                    <td className="px-4 py-2.5 text-right text-xs">{v.count}</td>
+                    <td className="px-4 py-2.5 text-right text-xs">{v?.count ?? 0}</td>
                     <td className="px-4 py-2.5 text-right">
                       {v.avg_score != null
                         ? <span className="text-xs font-mono text-amber-400">{v.avg_score.toFixed(2)}</span>

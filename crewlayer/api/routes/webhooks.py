@@ -9,6 +9,7 @@ from crewlayer.api.schemas.webhooks import (
     DeliveryResponse,
     WebhookCreate,
     WebhookResponse,
+    WebhookUpdate,
 )
 from crewlayer.db.models import WebhookDelivery, WebhookEndpoint
 
@@ -44,6 +45,27 @@ async def list_webhooks(tenant: TenantDep, db: DbDep) -> list[WebhookResponse]:
         .order_by(WebhookEndpoint.created_at.desc())
     )
     return [WebhookResponse.model_validate(e) for e in result.scalars().all()]
+
+
+@router.patch("/webhooks/{webhook_id}", response_model=WebhookResponse)
+async def update_webhook(
+    webhook_id: uuid.UUID, body: WebhookUpdate, tenant: TenantDep, db: DbDep
+) -> WebhookResponse:
+    """Toggle active status of a webhook endpoint."""
+    result = await db.execute(
+        select(WebhookEndpoint).where(
+            WebhookEndpoint.id == webhook_id,
+            WebhookEndpoint.tenant_id == tenant.id,
+        )
+    )
+    endpoint = result.scalar_one_or_none()
+    if endpoint is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Webhook no encontrado")
+    if body.active is not None:
+        endpoint.active = body.active
+    await db.commit()
+    await db.refresh(endpoint)
+    return WebhookResponse.model_validate(endpoint)
 
 
 @router.delete("/webhooks/{webhook_id}", status_code=status.HTTP_204_NO_CONTENT)

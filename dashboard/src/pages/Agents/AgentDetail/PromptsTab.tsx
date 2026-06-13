@@ -19,7 +19,7 @@ import {
 } from '@/api/prompts'
 import { getEvaluationSummary, listABTests } from '@/api/evaluations'
 import { getActionStats } from '@/api/actions'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
@@ -273,6 +273,7 @@ function NewVersionModal({
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>New Prompt Version</DialogTitle>
+          <DialogDescription>Create a new version based on the currently active prompt.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-1.5">
