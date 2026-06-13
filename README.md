@@ -21,6 +21,56 @@ Dashboard: http://localhost:8000/dashboard
 
 ---
 
+## How it works
+
+CrewLayer does not run your agents. It is the memory and infrastructure layer that sits next to whatever agent code you already have.
+
+```
+Your agent code (LangChain / AutoGen / CrewAI / custom)
+        │
+        │  "remember this"   "what do I know about X?"
+        │  "log this action" "what did I do last time?"
+        ▼
+   ┌─────────────────────────────────┐
+   │           CrewLayer             │
+   │  memory · actions · blackboard  │
+   └─────────────────────────────────┘
+        │
+        ▼
+  PostgreSQL + Redis + pgvector
+```
+
+**You build the agent.** It receives a message, decides what to do, calls tools, generates a response. That logic lives in your code, using whatever LLM or framework you prefer — OpenAI, Anthropic, LangChain, CrewAI, a plain Python script. CrewLayer has no opinion about any of that.
+
+**CrewLayer handles what happens around those calls.** Every time your agent learns something worth keeping, executes a tool, or needs to recall what it knew last week, it makes a quick call to CrewLayer via the SDK or REST API. CrewLayer stores that information in PostgreSQL (with vector embeddings for semantic search) and Redis, and returns it the next time the agent needs it.
+
+**Why this matters.** Without CrewLayer, every conversation starts from scratch — the agent has no memory of the user, no record of what it did before, and no way to share context with other agents running in parallel. With CrewLayer, the agent remembers the user across sessions, can pick up where it left off, coordinates with sibling agents through a shared blackboard, and every action is logged in an auditable, queryable history.
+
+```python
+# 1. Your agent receives a message
+user_message = "I prefer short answers"
+
+# 2. Your agent logic processes it (OpenAI, Anthropic, whatever you use)
+response = your_llm.chat(user_message)
+
+# 3. CrewLayer persists what you learned
+client.memory.save(agent_id=AGENT_ID, content="User prefers short answers", importance=0.9)
+client.actions.log(
+    agent_id=AGENT_ID,
+    tool_name="chat",
+    input_params={"message": user_message},
+    output_result={"response": response},
+    status="success",
+    duration_ms=340,
+)
+
+# 4. Next conversation — the agent remembers
+memories = client.memory.recall(agent_id=AGENT_ID, query="user preferences")
+# → ["User prefers short answers"]
+```
+
+---
+
 ## What it gives you
 
 | Feature | Details |
