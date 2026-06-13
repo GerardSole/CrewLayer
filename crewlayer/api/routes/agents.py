@@ -145,7 +145,7 @@ async def list_tags(tenant: TenantDep, db: DbDep) -> list[TagCount]:
         .order_by(text("tag"))
     )
     rows = (await db.execute(stmt)).all()
-    return [TagCount(tag=str(r.tag), count=int(r.count)) for r in rows]
+    return [TagCount(tag=str(r.tag), count=int(r._mapping["count"])) for r in rows]
 
 
 # ---------------------------------------------------------------------------
@@ -526,7 +526,7 @@ async def get_tree(
     agent_id: uuid.UUID,
     tenant: TenantDep,
     db: DbDep,
-) -> dict:
+) -> dict[str, Any]:
     """Return the hierarchical tree of supervisor→subordinate relations rooted at agent_id."""
     ar = AgentRelations(db)
     try:

@@ -149,7 +149,7 @@ class RatingsManager:
         by_version = [
             VersionScores(
                 prompt_version_id=str(r.prompt_version_id) if r.prompt_version_id else None,
-                count=r.count,
+                count=int(r._mapping["count"]),
                 avg_score=float(r.avg_score) if r.avg_score is not None else None,
                 thumbs_up=int(r.thumbs_up or 0),
                 thumbs_down=int(r.thumbs_down or 0),

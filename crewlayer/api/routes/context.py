@@ -72,7 +72,7 @@ def _sse_generator(
     """
 
     async def _gen() -> AsyncGenerator[ServerSentEvent, None]:
-        q = await broker.subscribe(channel, pattern=pattern)  # type: ignore[attr-defined]
+        q = await broker.subscribe(channel, pattern=pattern)
         loop = asyncio.get_running_loop()
         next_heartbeat = loop.time() + _HEARTBEAT_INTERVAL
         try:
@@ -107,7 +107,7 @@ def _sse_generator(
             )
         finally:
             with contextlib.suppress(Exception):
-                await broker.unsubscribe(channel, q)  # type: ignore[attr-defined]
+                await broker.unsubscribe(channel, q)
 
     return _gen()
 

@@ -1,6 +1,6 @@
 """crewlayer agents ..."""
 import json
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
 from rich.console import Console
@@ -27,7 +27,7 @@ def list_agents(
     as_json: Annotated[bool, typer.Option("--json", help="Output raw JSON")] = False,
 ) -> None:
     """List all agents for the current tenant."""
-    params: dict = {}
+    params: dict[str, Any] = {}
     if tags:
         params["tags"] = tags
     if status:
@@ -75,7 +75,7 @@ def create(
     as_json: Annotated[bool, typer.Option("--json", help="Output raw JSON")] = False,
 ) -> None:
     """Create a new agent."""
-    body: dict = {"name": name}
+    body: dict[str, Any] = {"name": name}
     if description:
         body["description"] = description
     if tags:

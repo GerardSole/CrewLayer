@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import anthropic
+from anthropic.types import TextBlock as _TextBlock
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -196,4 +197,5 @@ async def _generate_summary(title: str, memories: list[Memory]) -> str:
         system=_SUMMARY_SYSTEM,
         messages=[{"role": "user", "content": prompt}],
     )
-    return response.content[0].text
+    block = response.content[0]
+    return block.text if isinstance(block, _TextBlock) else ""

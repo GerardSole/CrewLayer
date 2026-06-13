@@ -1,6 +1,6 @@
 """crewlayer memory ..."""
 import json
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
 from rich.console import Console
@@ -74,7 +74,7 @@ def list_memories(
     as_json: Annotated[bool, typer.Option("--json", help="Output raw JSON")] = False,
 ) -> None:
     """List memories for an agent (paginated)."""
-    params: dict = {"page": page, "page_size": limit}
+    params: dict[str, Any] = {"page": page, "page_size": limit}
     if include_archived:
         params["include_archived"] = "true"
 

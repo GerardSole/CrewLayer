@@ -7,7 +7,7 @@ import json
 import uuid
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, cast
 
 from pydantic import BaseModel, field_validator
 from sqlalchemy import or_, select
@@ -336,7 +336,7 @@ async def export_agent(
     chunks: list[bytes] = []
     async for chunk in stream_export_agent(db, tenant_id, agent_id):
         chunks.append(chunk)
-    return json.loads(b"".join(chunks))  # type: ignore[return-value]
+    return cast(dict[str, Any], json.loads(b"".join(chunks)))
 
 
 # ---------------------------------------------------------------------------

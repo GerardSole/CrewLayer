@@ -166,7 +166,7 @@ async def get_evaluation_summary(
         ).one()
         trend_7d.append(DayTrend(
             day=day.isoformat(),
-            count=int(row.count or 0),
+            count=int(row._mapping["count"] or 0),
             avg_score=float(row.avg_score) if row.avg_score is not None else None,
             thumbs_up=int(row.thumbs_up or 0),
             thumbs_down=int(row.thumbs_down or 0),

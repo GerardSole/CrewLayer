@@ -9,7 +9,7 @@ import json
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 from redis.asyncio import Redis
 from sqlalchemy import func, select
@@ -40,7 +40,7 @@ class _Detection:
 
 
 def _agent_cfg(agent_config: dict[str, Any]) -> dict[str, Any]:
-    return agent_config.get("anomaly_detection", {})
+    return cast(dict[str, Any], agent_config.get("anomaly_detection", {}))
 
 
 class AnomalyManager:

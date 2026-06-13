@@ -1,6 +1,6 @@
 import asyncio
 import uuid
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import func, select
@@ -223,7 +223,7 @@ async def memory_stats(
             .group_by(Memory.status)
         )
     ).all()
-    count_map: dict = {row[0]: row[1] for row in count_rows}
+    count_map: dict[str, Any] = {row[0]: row[1] for row in count_rows}
     total_active = count_map.get(MemoryStatusEnum.active, 0)
     total_archived = count_map.get(MemoryStatusEnum.archived, 0)
 

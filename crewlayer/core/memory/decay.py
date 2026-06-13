@@ -27,6 +27,7 @@ Two entry points:
 """
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -139,7 +140,7 @@ async def forget_stale_memories(
                 stale_for_delete,
             )
         )
-        delete_ids: set = set(delete_ids_q.scalars().all())
+        delete_ids: set[uuid.UUID] = set(delete_ids_q.scalars().all())
 
         if delete_ids:
             await db.execute(delete(Memory).where(Memory.id.in_(delete_ids)))
@@ -163,7 +164,7 @@ async def forget_stale_memories(
             archive_where.append(Memory.id.not_in(delete_ids))
 
         archive_ids_q = await db.execute(select(Memory.id).where(*archive_where))
-        archive_ids: set = set(archive_ids_q.scalars().all())
+        archive_ids: set[uuid.UUID] = set(archive_ids_q.scalars().all())
 
         if archive_ids:
             await db.execute(
@@ -189,7 +190,7 @@ async def forget_stale_memories(
             decay_where.append(Memory.id.not_in(excluded))
 
         decay_ids_q = await db.execute(select(Memory.id).where(*decay_where))
-        decay_ids: set = set(decay_ids_q.scalars().all())
+        decay_ids: set[uuid.UUID] = set(decay_ids_q.scalars().all())
 
         if decay_ids:
             await db.execute(

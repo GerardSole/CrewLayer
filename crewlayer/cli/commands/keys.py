@@ -1,6 +1,6 @@
 """crewlayer keys ..."""
 import json
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
 from rich.console import Console
@@ -23,7 +23,7 @@ def create(
     as_json: Annotated[bool, typer.Option("--json", help="Output raw JSON")] = False,
 ) -> None:
     """Create a new API key for the authenticated tenant (key shown once)."""
-    body: dict = {"name": name}
+    body: dict[str, Any] = {"name": name}
     if scopes:
         body["scopes"] = [s.strip() for s in scopes.split(",") if s.strip()]
 

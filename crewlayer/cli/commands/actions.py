@@ -1,6 +1,6 @@
 """crewlayer actions ..."""
 import json
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
 from rich.console import Console
@@ -29,7 +29,7 @@ def list_actions(
     as_json: Annotated[bool, typer.Option("--json", help="Output raw JSON")] = False,
 ) -> None:
     """List action history for an agent."""
-    params: dict = {"limit": limit}
+    params: dict[str, Any] = {"limit": limit}
     if status:
         params["status"] = status
     if tool:

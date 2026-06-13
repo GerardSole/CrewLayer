@@ -1,12 +1,12 @@
 import asyncio
 import uuid
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sse_starlette.sse import EventSourceResponse  # type: ignore[attr-defined]
+from sse_starlette.sse import EventSourceResponse
 
 from crewlayer.api.deps import DbDep, RedisDep, TenantDep, check_scope
 from crewlayer.api.schemas.actions import (
@@ -47,7 +47,7 @@ async def _detect_anomalies_bg(
     tenant_id: uuid.UUID,
     agent_id: uuid.UUID,
     action_id: uuid.UUID,
-    agent_config: dict,
+    agent_config: dict[str, Any],
 ) -> None:
     """Run anomaly detection in a dedicated session so it never blocks the request.
 

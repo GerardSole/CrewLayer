@@ -1,7 +1,7 @@
 """Config file management: ~/.crewlayer/config.json"""
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 _DIR = Path.home() / ".crewlayer"
 _FILE = _DIR / "config.json"
@@ -11,7 +11,7 @@ def load() -> dict[str, Any]:
     if not _FILE.exists():
         return {}
     try:
-        return json.loads(_FILE.read_text())
+        return cast(dict[str, Any], json.loads(_FILE.read_text()))
     except Exception:
         return {}
 
@@ -23,7 +23,7 @@ def save(url: str, api_key: str) -> None:
 
 
 def url() -> str:
-    return load().get("url", "http://localhost:8000")
+    return str(load().get("url", "http://localhost:8000"))
 
 
 def api_key() -> str | None:
