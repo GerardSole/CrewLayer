@@ -3,6 +3,7 @@ import uuid
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock
 
+import anthropic
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -257,7 +258,7 @@ async def test_complete_episode_generates_summary(
     client: AsyncClient, db: AsyncSession, mocker: pytest.MonkeyPatch
 ) -> None:
     fake_summary = "Agent completed data analysis tasks successfully."
-    mock_create = AsyncMock(return_value=MagicMock(content=[MagicMock(text=fake_summary)]))
+    mock_create = AsyncMock(return_value=MagicMock(content=[MagicMock(spec=anthropic.types.TextBlock, text=fake_summary)]))
     mocker.patch("crewlayer.core.memory.episodic._client", new=MagicMock(
         messages=MagicMock(create=mock_create)
     ))
