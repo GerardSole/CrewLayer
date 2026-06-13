@@ -46,10 +46,32 @@ export interface RecallResponse {
   results: Memory[]
 }
 
+export interface MemoryMiniResponse {
+  id: string
+  content: string
+  importance: number
+  created_at: string
+  access_count: number
+}
+
 export interface MemoryStatsResponse {
   total_active: number
   total_archived: number
   avg_importance: number
+  oldest_memory?: MemoryMiniResponse
+  most_accessed_memory?: MemoryMiniResponse
+}
+
+export interface MessageOut {
+  role: string
+  content: string
+  metadata?: Record<string, unknown>
+}
+
+export interface ShortMemoryResponse {
+  session_id: string
+  messages: MessageOut[]
+  count: number
 }
 
 // ── Actions ──────────────────────────────────────────────────────────────────
@@ -228,6 +250,67 @@ export interface Anomaly {
 export interface AnomalyListResponse {
   items: Anomaly[]
   count: number
+}
+
+// ── Context history ───────────────────────────────────────────────────────────
+export interface ContextHistoryEntry {
+  id: string
+  namespace: string
+  key: string
+  value: Record<string, unknown> | null
+  version: number
+  written_by?: string | null
+  operation: string
+  timestamp: string
+}
+
+export interface ContextHistoryResponse {
+  namespace: string
+  key: string
+  entries: ContextHistoryEntry[]
+  next_cursor?: string | null
+}
+
+export interface RollbackResponse {
+  namespace: string
+  key: string
+  restored_version: number
+  new_version: number
+  entry: ContextEntry
+}
+
+// ── Episodes ──────────────────────────────────────────────────────────────────
+export interface Episode {
+  id: string
+  tenant_id: string
+  agent_id: string
+  title: string
+  description?: string
+  status: 'open' | 'completed'
+  summary?: string
+  started_at: string
+  completed_at?: string
+  metadata: Record<string, unknown>
+}
+
+export interface EpisodeMemorySummary {
+  id: string
+  content: string
+  importance: number
+  created_at: string
+}
+
+export interface EpisodeSessionSummary {
+  id: string
+  status: string
+  started_at: string
+  closed_at?: string
+  message_count: number
+}
+
+export interface EpisodeDetail extends Episode {
+  sessions: EpisodeSessionSummary[]
+  memories: EpisodeMemorySummary[]
 }
 
 // ── Agent extras ─────────────────────────────────────────────────────────────

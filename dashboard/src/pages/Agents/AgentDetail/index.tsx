@@ -12,11 +12,11 @@ import {
   AlertTriangle,
   Clock,
   Zap,
-  Brain,
   ListChecks,
   BarChart,
   FileText,
 } from 'lucide-react'
+import { MemoryTab } from './MemoryTab'
 import {
   LineChart,
   Line,
@@ -724,7 +724,7 @@ export default function AgentDetailPage() {
             <AgentOverviewTab agentId={agentId!} />
           </TabsContent>
           <TabsContent value="memory">
-            <StubTab icon={Brain} title="Memory" prompt="Prompt 3" />
+            <MemoryTab agentId={agentId!} />
           </TabsContent>
           <TabsContent value="actions">
             <StubTab icon={ListChecks} title="Actions" prompt="Prompt 4" />
