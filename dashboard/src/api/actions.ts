@@ -1,5 +1,5 @@
 import { getClient } from './client'
-import type { Action, ActionListResponse, ActionStatsResponse } from '@/types/api'
+import type { Action, ActionListResponse, ActionStatsResponse, Replay, ReplayListResponse } from '@/types/api'
 
 export async function listActions(
   agentId: string,
@@ -29,6 +29,34 @@ export async function getAction(agentId: string, actionId: string): Promise<Acti
 export async function getActionStats(agentId: string): Promise<ActionStatsResponse> {
   const { data } = await getClient().get<ActionStatsResponse>(
     `/v1/agents/${agentId}/actions/stats`,
+  )
+  return data
+}
+
+export async function createReplay(
+  agentId: string,
+  fromTimestamp: string,
+  toTimestamp: string,
+  speed: number,
+): Promise<Replay> {
+  const { data } = await getClient().post<Replay>(`/v1/agents/${agentId}/replays`, {
+    from_timestamp: fromTimestamp,
+    to_timestamp: toTimestamp,
+    speed,
+  })
+  return data
+}
+
+export async function getReplay(agentId: string, replayId: string): Promise<Replay> {
+  const { data } = await getClient().get<Replay>(
+    `/v1/agents/${agentId}/replays/${replayId}`,
+  )
+  return data
+}
+
+export async function listReplays(agentId: string): Promise<ReplayListResponse> {
+  const { data } = await getClient().get<ReplayListResponse>(
+    `/v1/agents/${agentId}/replays`,
   )
   return data
 }

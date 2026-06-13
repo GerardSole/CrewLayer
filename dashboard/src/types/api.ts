@@ -326,6 +326,42 @@ export interface TagCount {
   count: number
 }
 
+// ── Replays ──────────────────────────────────────────────────────────────────
+export interface Replay {
+  id: string
+  tenant_id: string
+  agent_id: string
+  status: 'pending' | 'running' | 'completed' | 'failed'
+  from_timestamp: string
+  to_timestamp: string
+  speed: number
+  action_count: number
+  created_at: string
+  started_at?: string
+  completed_at?: string
+}
+
+export interface ReplayListResponse {
+  items: Replay[]
+  count: number
+}
+
+// ── Evaluation ────────────────────────────────────────────────────────────────
+export interface Evaluation {
+  id: string
+  tenant_id: string
+  agent_id: string
+  action_id: string
+  session_id?: string
+  prompt_version_id?: string
+  rating_thumbs?: 'up' | 'down'
+  rating_score?: number
+  evaluator: string
+  notes?: string
+  created_at: string
+  created_by?: string
+}
+
 // ── Usage ────────────────────────────────────────────────────────────────────
 export interface UsageStats {
   requests_today: number
