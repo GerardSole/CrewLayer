@@ -1,5 +1,6 @@
 import asyncio
 import contextlib
+import pathlib
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
@@ -7,6 +8,8 @@ from datetime import UTC, datetime, timedelta
 import redis.asyncio as aioredis
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from crewlayer.api.middleware.audit import AuditLogMiddleware
@@ -160,6 +163,18 @@ app.include_router(evaluations.router, prefix="/v1", tags=["evaluations"])
 app.include_router(metrics_route.router, tags=["observability"])
 
 
+@app.get("/", include_in_schema=False)
+async def root() -> RedirectResponse:
+    return RedirectResponse(url="/dashboard/", status_code=302)
+
+
 @app.get("/health", tags=["health"])
 async def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+# Mount the built dashboard as static files at /dashboard.
+# The dashboard/ directory is built via `npm run build` inside dashboard/.
+_DASHBOARD_DIR = pathlib.Path(__file__).parent / "dashboard" / "dist"
+if _DASHBOARD_DIR.is_dir():
+    app.mount("/dashboard", StaticFiles(directory=_DASHBOARD_DIR, html=True), name="dashboard")

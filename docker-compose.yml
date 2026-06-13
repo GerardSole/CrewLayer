@@ -11,6 +11,8 @@ services:
         condition: service_healthy
     volumes:
       - .:/app
+      # Mount pre-built dashboard so changes to Python code don't lose the build
+      - dashboard_dist:/app/dashboard/dist
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
   postgres:
@@ -58,3 +60,4 @@ services:
 volumes:
   pgdata:
   redisdata:
+  dashboard_dist:
