@@ -145,7 +145,8 @@ curl http://localhost:8000/v1/context/shared/system_prompt \
 
 CrewLayer ships a built-in web UI served at **http://localhost:8000/dashboard** (or `http://your-host/dashboard` in production).
 
-> Screenshot placeholder — coming soon.
+<img width="1907" height="923" alt="Captura de pantalla 2026-06-13 231431" src="https://github.com/user-attachments/assets/5497b4b6-1134-4fa9-934b-daf669a79828" />
+
 
 After `docker compose up -d`, the dashboard is available immediately without any additional setup. Log in with any valid API key.
 
