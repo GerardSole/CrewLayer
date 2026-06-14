@@ -212,7 +212,14 @@ function AgentRow({ agent, onClick }: { agent: Agent; onClick: () => void }) {
         </div>
       </td>
       <td className="px-4 py-3">
-        <div className="flex items-center gap-2">
+        <div
+          className="flex items-center gap-2"
+          title={
+            agent.status === 'working'
+              ? `Working since ${formatRelativeTime(agent.status_updated_at)}`
+              : `Last active ${formatRelativeTime(agent.status_updated_at)}`
+          }
+        >
           <span className={`h-2 w-2 rounded-full ${STATUS_DOT[agent.status]}`} />
           <Badge variant={STATUS_VARIANT[agent.status]} className="capitalize text-xs">
             {agent.status}

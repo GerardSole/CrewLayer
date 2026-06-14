@@ -216,6 +216,30 @@ class Agent(Base):
     )
 
 
+class AgentStatusHistory(Base):
+    __tablename__ = "agent_status_history"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    agent_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("agents.id", ondelete="CASCADE"), nullable=False
+    )
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
+    )
+    status: Mapped[AgentStatusEnum] = mapped_column(
+        SAEnum(AgentStatusEnum, name="agent_status_enum"), nullable=False
+    )
+    timestamp: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        Index("ix_agent_status_history_agent_ts", "agent_id", "timestamp"),
+    )
+
+
 class Memory(Base):
     __tablename__ = "memories"
 

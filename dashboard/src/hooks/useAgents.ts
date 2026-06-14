@@ -6,6 +6,7 @@ import {
   updateAgent,
   deleteAgent,
   getAgentStatus,
+  getAgentStatusHistory,
   listAgentTags,
 } from '@/api/agents'
 import { getActionStats } from '@/api/actions'
@@ -33,6 +34,15 @@ export function useAgentStatus(agentId: string, refetchInterval = 1_000) {
     queryFn: () => getAgentStatus(agentId),
     enabled: !!agentId,
     refetchInterval,
+  })
+}
+
+export function useAgentStatusHistory(agentId: string) {
+  return useQuery({
+    queryKey: ['agent-status-history', agentId],
+    queryFn: () => getAgentStatusHistory(agentId, 10),
+    enabled: !!agentId,
+    refetchInterval: 3_000,
   })
 }
 

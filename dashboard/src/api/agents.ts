@@ -1,5 +1,5 @@
 import { getClient } from './client'
-import type { Agent, AgentList, AgentStatusResponse, TagCount } from '@/types/api'
+import type { Agent, AgentList, AgentStatusHistoryEntry, AgentStatusResponse, TagCount } from '@/types/api'
 
 export async function listAgents(params?: {
   status?: string
@@ -61,6 +61,17 @@ export async function addAgentTags(agentId: string, tags: string[]): Promise<Age
 export async function removeAgentTag(agentId: string, tag: string): Promise<Agent> {
   const { data } = await getClient().delete<Agent>(
     `/v1/agents/${agentId}/tags/${encodeURIComponent(tag)}`,
+  )
+  return data
+}
+
+export async function getAgentStatusHistory(
+  agentId: string,
+  limit = 10,
+): Promise<AgentStatusHistoryEntry[]> {
+  const { data } = await getClient().get<AgentStatusHistoryEntry[]>(
+    `/v1/agents/${agentId}/status/history`,
+    { params: { limit } },
   )
   return data
 }

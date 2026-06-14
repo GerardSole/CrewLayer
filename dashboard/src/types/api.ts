@@ -343,6 +343,12 @@ export interface AgentStatusResponse {
   updated_at: string
 }
 
+export interface AgentStatusHistoryEntry {
+  id: string
+  status: AgentStatus
+  timestamp: string
+}
+
 export interface TagCount {
   tag: string
   count: number

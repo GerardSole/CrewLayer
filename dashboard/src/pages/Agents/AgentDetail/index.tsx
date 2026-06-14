@@ -37,7 +37,7 @@ import { toast } from 'sonner'
 import { getAgent, updateAgent, deleteAgent, removeAgentTag, addAgentTags } from '@/api/agents'
 import { getActionStats, listActions } from '@/api/actions'
 import { getEvaluationSummary, listAnomalies } from '@/api/evaluations'
-import { useAgentStatus, useUpdateAgent, useDeleteAgent } from '@/hooks/useAgents'
+import { useAgentStatus, useAgentStatusHistory, useUpdateAgent, useDeleteAgent } from '@/hooks/useAgents'
 import { Sheet } from '@/components/ui/sheet'
 import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
@@ -316,6 +316,49 @@ function MiniStat({
   )
 }
 
+// ── Status History ─────────────────────────────────────────────────────────────
+
+const HISTORY_VARIANT: Record<string, 'success' | 'warning' | 'error'> = {
+  idle: 'success',
+  working: 'warning',
+  error: 'error',
+}
+
+function StatusHistorySection({ agentId }: { agentId: string }) {
+  const { data: history = [], isLoading } = useAgentStatusHistory(agentId)
+
+  if (isLoading) return <Skeleton className="h-28 w-full" />
+  if (history.length === 0) return null
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-sm font-medium flex items-center gap-2">
+          <Clock className="h-4 w-4 text-muted-foreground" />
+          Status History
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          {history.map((entry) => (
+            <div key={entry.id} className="flex items-center justify-between text-xs">
+              <Badge
+                variant={HISTORY_VARIANT[entry.status] ?? 'secondary'}
+                className="capitalize"
+              >
+                {entry.status}
+              </Badge>
+              <span className="text-muted-foreground tabular-nums">
+                {formatRelativeTime(entry.timestamp)}
+              </span>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 // ── Overview tab ──────────────────────────────────────────────────────────────
 
 function AgentOverviewTab({ agentId }: { agentId: string }) {
@@ -376,6 +419,9 @@ function AgentOverviewTab({ agentId }: { agentId: string }) {
 
   return (
     <div className="space-y-6">
+      {/* Status history — shows transitions missed by polling */}
+      <StatusHistorySection agentId={agentId} />
+
       {/* KPI row */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <MiniStat

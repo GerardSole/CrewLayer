@@ -24,7 +24,7 @@ from crewlayer.core.agents.status import (
     read_cached_status,
 )
 from crewlayer.core.webhooks.dispatcher import dispatch
-from crewlayer.db.models import Agent, AgentRelationTypeEnum, AgentStatusEnum
+from crewlayer.db.models import Agent, AgentRelationTypeEnum, AgentStatusEnum, AgentStatusHistory
 
 router = APIRouter()
 
@@ -60,6 +60,14 @@ class AgentResponse(BaseModel):
 class AgentStatusUpdate(BaseModel):
     status: AgentStatusEnum
     session_id: uuid.UUID | None = None
+
+
+class StatusHistoryEntry(BaseModel):
+    id: uuid.UUID
+    status: AgentStatusEnum
+    timestamp: datetime
+
+    model_config = {"from_attributes": True}
 
 
 class AgentStatusResponse(BaseModel):
@@ -422,7 +430,7 @@ async def update_alerts_config(
 
 @router.patch(
     "/{agent_id}/status",
-    response_model=AgentStatusResponse,
+    response_model=AgentResponse,
     dependencies=[check_scope("agents:write")],
 )
 async def update_agent_status(
@@ -431,14 +439,11 @@ async def update_agent_status(
     tenant: TenantDep,
     db: DbDep,
     redis: RedisDep,
-) -> AgentStatusResponse:
+) -> AgentResponse:
     """Update the runtime status of an agent (idle / working / error)."""
     now = datetime.now(UTC)
 
-    # Single UPDATE … RETURNING statement: bypasses ORM dirty-tracking and the
-    # identity map entirely (synchronize_session=False + no pre-load SELECT).
-    # RETURNING Agent.id gives us the 404 check without a second round-trip.
-    result = await db.execute(
+    upd = await db.execute(
         sa_update(Agent)
         .where(Agent.id == agent_id, Agent.tenant_id == tenant.id)
         .values(
@@ -446,26 +451,56 @@ async def update_agent_status(
             status_updated_at=now,
             current_session_id=body.session_id,
         )
-        .returning(Agent.id)
         .execution_options(synchronize_session=False)
     )
-    if result.one_or_none() is None:
+    if upd.rowcount == 0:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agente no encontrado")
+
+    db.add(AgentStatusHistory(
+        agent_id=agent_id,
+        tenant_id=tenant.id,
+        status=body.status,
+        timestamp=now,
+    ))
     await db.commit()
 
-    await cache_status(agent_id, body.status, body.session_id, now, redis)
+    result = await db.execute(
+        select(Agent).where(Agent.id == agent_id, Agent.tenant_id == tenant.id)
+    )
+    agent = result.scalar_one_or_none()
+    if agent is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agente no encontrado")
+
+    await cache_status(agent.id, agent.status, agent.current_session_id, agent.status_updated_at, redis)
     asyncio.create_task(
         dispatch(tenant.id, "agent.status_changed", {
             "agent_id": str(agent_id),
-            "status": body.status.value,
+            "status": agent.status.value,
         })
     )
-    return AgentStatusResponse(
-        agent_id=agent_id,
-        status=body.status,
-        current_session_id=body.session_id,
-        updated_at=now,
+    return AgentResponse.model_validate(agent)
+
+
+@router.get(
+    "/{agent_id}/status/history",
+    response_model=list[StatusHistoryEntry],
+    dependencies=[check_scope("agents:read")],
+)
+async def get_agent_status_history(
+    agent_id: uuid.UUID,
+    tenant: TenantDep,
+    db: DbDep,
+    limit: int = Query(20, ge=1, le=100),
+) -> list[StatusHistoryEntry]:
+    """Return the N most recent status transitions for an agent, newest first."""
+    await _get_agent_or_404(agent_id, tenant.id, db)
+    result = await db.execute(
+        select(AgentStatusHistory)
+        .where(AgentStatusHistory.agent_id == agent_id, AgentStatusHistory.tenant_id == tenant.id)
+        .order_by(AgentStatusHistory.timestamp.desc())
+        .limit(limit)
     )
+    return list(result.scalars().all())
 
 
 # ---------------------------------------------------------------------------

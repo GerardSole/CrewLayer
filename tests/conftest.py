@@ -49,6 +49,7 @@ from crewlayer.db.models import (
     Action,
     Agent,
     AgentRelation,
+    AgentStatusHistory,
     Anomaly,
     ApiKey,
     AuditLog,
@@ -75,7 +76,7 @@ _engine = create_async_engine(_db_url, poolclass=NullPool)
 _TestSession = async_sessionmaker(_engine, expire_on_commit=False)
 
 # Deletion order respects FK constraints (children before parents)
-_CLEANUP_ORDER = [AuditLog, ApiKey, ABTestAssignment, ABTest, Anomaly, Evaluation, PromptTestResult, Action, Replay, ContextHistory, ContextEntry, EpisodeMemory, Memory, WebhookDelivery, WebhookEndpoint, Session, Episode, AgentRelation, PromptVersion, Agent, Tenant]
+_CLEANUP_ORDER = [AuditLog, ApiKey, ABTestAssignment, ABTest, Anomaly, Evaluation, PromptTestResult, Action, Replay, ContextHistory, ContextEntry, EpisodeMemory, Memory, WebhookDelivery, WebhookEndpoint, Session, Episode, AgentStatusHistory, AgentRelation, PromptVersion, Agent, Tenant]
 
 
 @pytest_asyncio.fixture
