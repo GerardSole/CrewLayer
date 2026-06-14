@@ -98,6 +98,7 @@ memories = client.memory.recall(agent_id=AGENT_ID, query="user preferences")
 | **Dashboard web** | React + Vite management UI served at `/dashboard` — agents, memory, actions, evaluations, prompts, blackboard |
 | **Prompt management** | Version-controlled prompts with line-by-line diff, activate/rollback, and per-version quality metrics |
 | **Evaluation layer** | Human ratings (thumbs + score) per action; aggregated metrics, 7-day trend, per-version breakdown |
+| **Auto-evaluation** | Automatic LLM-as-a-judge scoring of agent actions using Claude — correctness, efficiency, completeness, safety |
 | **A/B testing** | Compare two prompt versions; session assignment, per-variant metrics, declare winner |
 | **Automatic anomaly detection** | Detects latency spikes, error bursts, and evaluation drops; fires webhooks and surfaces in dashboard |
 | **Python SDK** | Sync + async client backed by httpx; typed exceptions; retry with backoff |
@@ -346,6 +347,8 @@ stream.close(); // when done
 | `GET` | `/v1/agents/{id}/actions` | List actions (cursor paginated) |
 | `GET` | `/v1/agents/{id}/actions/{action_id}` | Get one action |
 | `GET` | `/v1/agents/{id}/actions/stats` | Aggregate stats (total, error rate, avg duration) |
+| `POST` | `/v1/agents/{id}/actions/{action_id}/auto-evaluate` | Auto-evaluate an action with Claude as judge (returns score, thumbs, reasoning, per-criterion scores) |
+| `POST` | `/v1/agents/{id}/actions/auto-evaluate-batch` | Start background batch auto-evaluation for all pending actions (returns immediately) |
 
 ### Prompts
 
