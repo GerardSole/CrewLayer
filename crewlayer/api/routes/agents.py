@@ -436,6 +436,7 @@ async def update_agent_status(
     """Update the runtime status of an agent (idle / working / error)."""
     agent = await _get_agent_or_404(agent_id, tenant.id, db)
     apply_status(agent, body.status, body.session_id)
+    await db.flush()   # explicit flush: ensures dirty-detection fires before commit
     await db.commit()
     await db.refresh(agent)
     await cache_status(agent.id, agent.status, agent.current_session_id, agent.status_updated_at, redis)

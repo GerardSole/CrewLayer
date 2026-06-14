@@ -193,6 +193,72 @@ async def test_patch_status_with_session_id(client: AsyncClient) -> None:
     assert body["current_session_id"] == fake_sid
 
 
+async def test_patch_status_persists_to_postgresql(
+    client: AsyncClient, db: AsyncSession
+) -> None:
+    """PATCH /status must write through to PostgreSQL, not only the ORM identity map.
+
+    Verification uses db.expunge_all() to clear SQLAlchemy's in-process cache before
+    re-querying, so the SELECT is forced to hit the database rather than return the
+    locally-mutated object.  This catches the class of bugs where expire_on_commit=False
+    + multiple commits per session leave the dirty flag unset and the UPDATE is silently
+    skipped.
+    """
+    _, headers = await _setup(client)
+    agent = await _create_agent(client, headers)
+    aid = uuid.UUID(agent["id"])
+
+    # ── working ──────────────────────────────────────────────────────────────
+    r = await client.patch(
+        f"/v1/agents/{aid}/status",
+        json={"status": "working"},
+        headers=headers,
+    )
+    assert r.status_code == 200
+    assert r.json()["status"] == "working", "PATCH response must reflect new status"
+
+    # Clear identity map → next SELECT must go to the DB
+    db.expunge_all()
+    result = await db.execute(select(Agent).where(Agent.id == aid))
+    row = result.scalar_one()
+    assert row.status == AgentStatusEnum.working, (
+        f"PostgreSQL has {row.status!r} after PATCH to 'working' — "
+        "status update was not committed to the database"
+    )
+
+    # GET /v1/agents/{id} must also reflect the change (exercises the REST layer)
+    r = await client.get(f"/v1/agents/{aid}", headers=headers)
+    assert r.status_code == 200
+    assert r.json()["status"] == "working"
+
+    # ── idle (round-trip back) ────────────────────────────────────────────────
+    r = await client.patch(
+        f"/v1/agents/{aid}/status",
+        json={"status": "idle"},
+        headers=headers,
+    )
+    assert r.status_code == 200
+    assert r.json()["status"] == "idle"
+
+    db.expunge_all()
+    result = await db.execute(select(Agent).where(Agent.id == aid))
+    assert result.scalar_one().status == AgentStatusEnum.idle, (
+        "PostgreSQL was not updated when status changed back to 'idle'"
+    )
+
+    # ── error ─────────────────────────────────────────────────────────────────
+    r = await client.patch(
+        f"/v1/agents/{aid}/status",
+        json={"status": "error"},
+        headers=headers,
+    )
+    assert r.status_code == 200
+
+    db.expunge_all()
+    result = await db.execute(select(Agent).where(Agent.id == aid))
+    assert result.scalar_one().status == AgentStatusEnum.error
+
+
 async def test_patch_status_unknown_agent_returns_404(client: AsyncClient) -> None:
     """PATCH /status on a non-existent agent returns 404."""
     _, headers = await _setup(client)
