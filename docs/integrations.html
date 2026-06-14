@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Integrations — CrewLayer Docs</title>
+  <meta name="description" content="LangChain, AutoGen, LlamaIndex, and Vercel AI SDK integrations for CrewLayer." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
+  <link rel="stylesheet" href="docs.css" />
+</head>
+<body>
+<div class="overlay" id="overlay"></div>
+<header class="topbar">
+  <div class="topbar-left">
+    <button class="sidebar-btn" id="sidebarBtn" aria-label="Toggle sidebar">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    </button>
+    <a href="../landing/index.html" class="topbar-logo">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="15" width="18" height="4" rx="2" fill="#22c55e" opacity=".95"/><rect x="3" y="10" width="18" height="4" rx="2" fill="#22c55e" opacity=".6"/><rect x="3" y="5" width="18" height="4" rx="2" fill="#22c55e" opacity=".28"/></svg>CrewLayer
+    </a>
+    <span class="topbar-sep">/</span>
+    <span class="topbar-section">Integrations</span>
+  </div>
+  <div class="topbar-right">
+    <div class="search-wrap">
+      <svg class="search-icon" width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.5"/><path d="M11 11l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <input type="search" id="docsSearch" class="search-input" placeholder="Search docs…" autocomplete="off" />
+      <div id="searchDrop" class="search-drop hidden"></div>
+    </div>
+    <a href="https://github.com/GerardSole/CrewLayer" class="topbar-gh">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>GitHub
+    </a>
+  </div>
+</header>
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-header"><span class="sidebar-version">v1.0 · MIT License</span></div>
+  <nav class="sidebar-nav">
+    <div class="nav-group"><span class="nav-group-label">Getting Started</span><a href="index.html" class="nav-link">Introduction</a><a href="quickstart.html" class="nav-link">Quick Start</a></div>
+    <div class="nav-group"><span class="nav-group-label">Concepts</span><a href="concepts.html" class="nav-link">Core Concepts</a></div>
+    <div class="nav-group"><span class="nav-group-label">Reference</span><a href="api-reference.html" class="nav-link">API Reference</a><a href="sdk-python.html" class="nav-link">Python SDK</a><a href="sdk-typescript.html" class="nav-link">TypeScript SDK</a><a href="mcp.html" class="nav-link">MCP Server</a></div>
+    <div class="nav-group"><span class="nav-group-label">Deployment</span><a href="self-hosting.html" class="nav-link">Self-Hosting</a></div>
+    <div class="nav-group"><span class="nav-group-label">Guides</span><a href="integrations.html" class="nav-link">Integrations</a></div>
+  </nav>
+</aside>
+
+<main class="content">
+<article class="content-body">
+
+<h1>Integrations</h1>
+<div class="page-meta"><span>Guides</span><span>·</span><span>LangChain · AutoGen · LlamaIndex · Vercel AI</span></div>
+
+<p>CrewLayer integrates with the most popular AI orchestration frameworks. Install the extras and drop in the adapters — your agent gets persistent memory and action logging with no changes to your core logic.</p>
+
+<h2 id="langchain">LangChain</h2>
+
+<h3 id="langchain-install">Installation</h3>
+<div class="cb">
+  <div class="cb-head"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="cb-file">terminal</span></div>
+  <div class="cb-body"><pre><code class="language-bash">pip install crewlayer[langchain]</code></pre></div>
+</div>
+
+<h3 id="langchain-memory">CrewLayerMemory</h3>
+<p><code>CrewLayerMemory</code> is a LangChain <code>BaseMemory</code> subclass that transparently saves and recalls conversation history through CrewLayer's long-term memory.</p>
+<div class="cb">
+  <div class="cb-head"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="cb-file">langchain_example.py</span></div>
+  <div class="cb-body"><pre><code class="language-python">from langchain_anthropic import ChatAnthropic
+from langchain.agents import AgentExecutor, create_tool_calling_agent
+from langchain_core.prompts import ChatPromptTemplate
+from crewlayer.integrations.langchain import CrewLayerMemory, CrewLayerCallbackHandler
+
+# Initialize memory and callback handler
+memory = CrewLayerMemory(
+    agent_id="agt_langchain_001",
+    api_key="crwl_...",
+    base_url="http://localhost:8000",
+    top_k=5,            # memories recalled per turn
+    auto_extract=True,  # extract facts automatically after each turn
+)
+
+handler = CrewLayerCallbackHandler(
+    agent_id="agt_langchain_001",
+    api_key="crwl_...",
+    base_url="http://localhost:8000",
+)
+
+# Build LangChain agent
+llm = ChatAnthropic(model="claude-opus-4-8")
+tools = [...]  # your tools here
+
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "You are a helpful assistant. Relevant memories: {crewlayer_memory}"),
+    ("placeholder", "{chat_history}"),
+    ("human", "{input}"),
+    ("placeholder", "{agent_scratchpad}"),
+])
+
+agent = create_tool_calling_agent(llm, tools, prompt)
+executor = AgentExecutor(
+    agent=agent,
+    tools=tools,
+    memory=memory,
+    callbacks=[handler],
+    verbose=True,
+)
+
+# Run — memory is saved and recalled automatically
+result = executor.invoke({"input": "What's the capital of France?"})
+print(result["output"])</code></pre></div>
+</div>
+
+<h3 id="langchain-callback">CrewLayerCallbackHandler</h3>
+<p><code>CrewLayerCallbackHandler</code> logs every LLM call, tool call, and chain run to CrewLayer's action log. Pass it to <code>AgentExecutor</code> via <code>callbacks</code>.</p>
+<div class="cb">
+  <div class="cb-head"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="cb-file">langchain_callback.py</span></div>
+  <div class="cb-body"><pre><code class="language-python">from crewlayer.integrations.langchain import CrewLayerCallbackHandler
+
+handler = CrewLayerCallbackHandler(
+    agent_id="agt_langchain_001",
+    api_key="crwl_...",
+    base_url="http://localhost:8000",
+    log_llm_calls=True,    # log LLM start/end
+    log_tool_calls=True,   # log tool calls
+    log_chain_runs=False,  # skip internal chain events
+)
+
+# Pass to any LangChain component
+executor = AgentExecutor(..., callbacks=[handler])
+
+# Or to a specific chain
+chain.invoke({"input": "..."}, config={"callbacks": [handler]})</code></pre></div>
+</div>
+
+<h2 id="autogen">AutoGen</h2>
+
+<h3 id="autogen-install">Installation</h3>
+<div class="cb">
+  <div class="cb-head"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="cb-file">terminal</span></div>
+  <div class="cb-body"><pre><code class="language-bash">pip install crewlayer[autogen]</code></pre></div>
+</div>
+
+<h3 id="autogen-mixin">CrewLayerMemoryMixin</h3>
+<p><code>CrewLayerMemoryMixin</code> injects persistent memory into any AutoGen <code>ConversableAgent</code> subclass. It overrides <code>process_last_received_message</code> to recall memories before each response and saves new memories after each reply.</p>
+<div class="cb">
+  <div class="cb-head"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="cb-file">autogen_example.py</span></div>
+  <div class="cb-body"><pre><code class="language-python">import autogen
+from crewlayer.integrations.autogen import CrewLayerMemoryMixin
+
+# Mix CrewLayer into any AutoGen agent
+class CrewLayerAssistant(CrewLayerMemoryMixin, autogen.AssistantAgent):
+    pass
+
+class CrewLayerUser(CrewLayerMemoryMixin, autogen.UserProxyAgent):
+    pass
+
+assistant = CrewLayerAssistant(
+    name="assistant",
+    crewlayer_agent_id="agt_autogen_assistant",
+    crewlayer_api_key="crwl_...",
+    crewlayer_base_url="http://localhost:8000",
+    system_message="You are a helpful assistant with persistent memory.",
+    llm_config={"model": "claude-opus-4-8", ...},
+)
+
+user_proxy = CrewLayerUser(
+    name="user_proxy",
+    crewlayer_agent_id="agt_autogen_user",
+    crewlayer_api_key="crwl_...",
+    crewlayer_base_url="http://localhost:8000",
+    human_input_mode="NEVER",
+    max_consecutive_auto_reply=5,
+)
+
+# Run multi-turn conversation with shared persistent memory
+user_proxy.initiate_chat(
+    assistant,
+    message="Summarize what we discussed last time.",
+)</code></pre></div>
+</div>
+
+<h3 id="autogen-blackboard">Shared Blackboard with GroupChatManager</h3>
+<p>Multiple agents in a <code>GroupChat</code> can share state via the CrewLayer blackboard. Any agent can write to a shared namespace; all agents see updates immediately via SSE.</p>
+<div class="cb">
+  <div class="cb-head"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="cb-file">autogen_groupchat.py</span></div>
+  <div class="cb-body"><pre><code class="language-python">import autogen
+from crewlayer import CrewLayerClient
+
+cl = CrewLayerClient(api_key="crwl_...", base_url="http://localhost:8000")
+SHARED_NS = "project_alpha"
+
+def write_to_blackboard(key: str, value: str) -> str:
+    """Write a value to the shared blackboard."""
+    cl.context.write(namespace=SHARED_NS, key=key, value=value)
+    return f"Written {key} = {value}"
+
+def read_from_blackboard(key: str) -> str:
+    """Read a value from the shared blackboard."""
+    entry = cl.context.read(namespace=SHARED_NS, key=key)
+    return entry["value"] if entry else "Not found"
+
+researcher = autogen.AssistantAgent(
+    name="researcher",
+    system_message="Research agent. Use write_to_blackboard to share findings.",
+    llm_config={
+        "model": "claude-opus-4-8",
+        "functions": [
+            {"name": "write_to_blackboard", "description": "...", "parameters": {...}},
+            {"name": "read_from_blackboard", "description": "...", "parameters": {...}},
+        ],
+    },
+)
+
+writer = autogen.AssistantAgent(
+    name="writer",
+    system_message="Writer agent. Use read_from_blackboard to get research findings.",
+    llm_config={"model": "claude-opus-4-8", ...},
+)
+
+group_chat = autogen.GroupChat(
+    agents=[researcher, writer],
+    messages=[],
+    max_round=10,
+)
+manager = autogen.GroupChatManager(groupchat=group_chat, llm_config={...})
+
+researcher.initiate_chat(manager, message="Research the latest trends in AI memory.")</code></pre></div>
+</div>
+
+<h2 id="llamaindex">LlamaIndex</h2>
+
+<h3 id="llamaindex-install">Installation</h3>
+<div class="cb">
+  <div class="cb-head"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="cb-file">terminal</span></div>
+  <div class="cb-body"><pre><code class="language-bash">pip install crewlayer[llamaindex]</code></pre></div>
+</div>
+
+<h3 id="llamaindex-vector">CrewLayerVectorIndex</h3>
+<p><code>CrewLayerVectorIndex</code> wraps CrewLayer's semantic memory as a LlamaIndex <code>VectorStoreIndex</code>. Documents inserted go into the agent's long-term memory; queries use cosine similarity over pgvector embeddings.</p>
+<div class="cb">
+  <div class="cb-head"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="cb-file">llamaindex_example.py</span></div>
+  <div class="cb-body"><pre><code class="language-python">from llama_index.core import Document
+from crewlayer.integrations.llamaindex import CrewLayerVectorIndex
+
+# Create a vector index backed by CrewLayer's long-term memory
+index = CrewLayerVectorIndex(
+    agent_id="agt_llama_001",
+    api_key="crwl_...",
+    base_url="http://localhost:8000",
+    top_k=5,  # number of results to return on query
+)
+
+# Insert documents — stored as memories with auto-generated embeddings
+docs = [
+    Document(text="CrewLayer provides persistent memory for AI agents."),
+    Document(text="It supports PostgreSQL with pgvector for semantic search."),
+    Document(text="Agents can share state via the blackboard (context namespace)."),
+]
+index.insert_documents(docs)
+
+# Query — performs semantic recall from CrewLayer memory
+query_engine = index.as_query_engine()
+response = query_engine.query("How does CrewLayer handle memory?")
+print(str(response))</code></pre></div>
+</div>
+
+<h3 id="llamaindex-callback">CrewLayerCallbackManager</h3>
+<p>Log all LlamaIndex query and retrieval events to CrewLayer's action log:</p>
+<div class="cb">
+  <div class="cb-head"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="cb-file">llamaindex_callback.py</span></div>
+  <div class="cb-body"><pre><code class="language-python">from llama_index.core import Settings
+from crewlayer.integrations.llamaindex import CrewLayerCallbackHandler
+
+handler = CrewLayerCallbackHandler(
+    agent_id="agt_llama_001",
+    api_key="crwl_...",
+    base_url="http://localhost:8000",
+)
+
+Settings.callback_manager.add_handler(handler)
+
+# All subsequent LlamaIndex calls are now logged to CrewLayer
+query_engine = index.as_query_engine()
+response = query_engine.query("Tell me about memory management.")</code></pre></div>
+</div>
+
+<h2 id="vercel-ai">Vercel AI SDK</h2>
+
+<h3 id="vercel-ai-install">Installation</h3>
+<div class="cb">
+  <div class="cb-head"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="cb-file">terminal</span></div>
+  <div class="cb-body"><pre><code class="language-bash">npm install crewlayer @ai-sdk/anthropic ai</code></pre></div>
+</div>
+
+<h3 id="vercel-ai-middleware">withCrewLayerMemory</h3>
+<p><code>withCrewLayerMemory</code> is a Vercel AI middleware that recalls relevant memories before the LLM call and saves new memories after. Drop it into any <code>streamText</code> or <code>generateText</code> call.</p>
+<div class="cb">
+  <div class="cb-head"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="cb-file">app/api/chat/route.ts</span></div>
+  <div class="cb-body"><pre><code class="language-typescript">import { streamText } from "ai";
+import { anthropic } from "@ai-sdk/anthropic";
+import { withCrewLayerMemory } from "crewlayer/vercel-ai";
+import { NextRequest } from "next/server";
+
+const crewlayerMiddleware = withCrewLayerMemory({
+  agentId: "agt_vercel_001",
+  apiKey: process.env.CREWLAYER_API_KEY!,
+  baseUrl: process.env.CREWLAYER_BASE_URL ?? "http://localhost:8000",
+  topK: 5,
+  autoExtract: true, // extract facts from each response and save as memories
+});
+
+export async function POST(req: NextRequest) {
+  const { messages } = await req.json();
+
+  const result = streamText({
+    model: anthropic("claude-opus-4-8"),
+    system: "You are a helpful assistant with persistent memory.",
+    messages,
+    experimental_providerMetadata: {
+      crewlayer: { middleware: crewlayerMiddleware },
+    },
+  });
+
+  return result.toDataStreamResponse();
+}</code></pre></div>
+</div>
+
+<h3 id="vercel-ai-client">Client-side Chat UI</h3>
+<div class="cb">
+  <div class="cb-head"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="cb-file">app/page.tsx</span></div>
+  <div class="cb-body"><pre><code class="language-typescript">"use client";
+
+import { useChat } from "ai/react";
+
+export default function Chat() {
+  const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
+    api: "/api/chat",
+  });
+
+  return (
+    &lt;div&gt;
+      {messages.map((m) =&gt; (
+        &lt;div key={m.id}&gt;
+          &lt;span&gt;{m.role === "user" ? "You" : "AI"}: &lt;/span&gt;
+          {m.content}
+        &lt;/div&gt;
+      ))}
+      &lt;form onSubmit={handleSubmit}&gt;
+        &lt;input
+          value={input}
+          onChange={handleInputChange}
+          placeholder="Say something..."
+          disabled={isLoading}
+        /&gt;
+        &lt;button type="submit" disabled={isLoading}&gt;Send&lt;/button&gt;
+      &lt;/form&gt;
+    &lt;/div&gt;
+  );
+}</code></pre></div>
+</div>
+
+<h3 id="vercel-ai-context-stream">Streaming Blackboard Updates</h3>
+<p>Display live context updates from the blackboard in your Next.js app using the TypeScript SDK's SSE stream:</p>
+<div class="cb">
+  <div class="cb-head"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="cb-file">components/StatusPanel.tsx</span></div>
+  <div class="cb-body"><pre><code class="language-typescript">"use client";
+
+import { useEffect, useState } from "react";
+import { CrewLayerClient } from "crewlayer";
+
+const client = new CrewLayerClient({
+  apiKey: process.env.NEXT_PUBLIC_CREWLAYER_KEY!,
+  baseUrl: process.env.NEXT_PUBLIC_CREWLAYER_URL ?? "http://localhost:8000",
+});
+
+export function StatusPanel({ namespace }: { namespace: string }) {
+  const [entries, setEntries] = useState&lt;Record&lt;string, string&gt;&gt;({});
+
+  useEffect(() =&gt; {
+    const stream = client.context.subscribe(namespace);
+
+    stream.on("update", (event) =&gt; {
+      setEntries((prev) =&gt; ({ ...prev, [event.key]: event.value }));
+    });
+
+    return () =&gt; stream.close();
+  }, [namespace]);
+
+  return (
+    &lt;ul&gt;
+      {Object.entries(entries).map(([k, v]) =&gt; (
+        &lt;li key={k}&gt;&lt;strong&gt;{k}&lt;/strong&gt;: {v}&lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}</code></pre></div>
+</div>
+
+<div class="page-nav">
+  <a href="self-hosting.html" class="page-nav-link prev">
+    <span class="page-nav-dir">← Previous</span>
+    <span class="page-nav-title">Self-Hosting</span>
+  </a>
+</div>
+
+</article>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/typescript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/bash.min.js"></script>
+<script src="docs.js"></script>
+</body>
+</html>

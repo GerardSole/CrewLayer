@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>API Reference — CrewLayer Docs</title>
+  <meta name="description" content="Complete reference for all CrewLayer REST endpoints." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
+  <link rel="stylesheet" href="docs.css" />
+</head>
+<body>
+<div class="overlay" id="overlay"></div>
+<header class="topbar">
+  <div class="topbar-left">
+    <button class="sidebar-btn" id="sidebarBtn" aria-label="Toggle sidebar">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    </button>
+    <a href="../landing/index.html" class="topbar-logo">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="15" width="18" height="4" rx="2" fill="#22c55e" opacity=".95"/><rect x="3" y="10" width="18" height="4" rx="2" fill="#22c55e" opacity=".6"/><rect x="3" y="5" width="18" height="4" rx="2" fill="#22c55e" opacity=".28"/></svg>CrewLayer
+    </a>
+    <span class="topbar-sep">/</span>
+    <span class="topbar-section">API Reference</span>
+  </div>
+  <div class="topbar-right">
+    <div class="search-wrap">
+      <svg class="search-icon" width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.5"/><path d="M11 11l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <input type="search" id="docsSearch" class="search-input" placeholder="Search docs…" autocomplete="off" />
+      <div id="searchDrop" class="search-drop hidden"></div>
+    </div>
+    <a href="https://github.com/GerardSole/CrewLayer" class="topbar-gh">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>GitHub
+    </a>
+  </div>
+</header>
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-header"><span class="sidebar-version">v1.0 · MIT License</span></div>
+  <nav class="sidebar-nav">
+    <div class="nav-group"><span class="nav-group-label">Getting Started</span><a href="index.html" class="nav-link">Introduction</a><a href="quickstart.html" class="nav-link">Quick Start</a></div>
+    <div class="nav-group"><span class="nav-group-label">Concepts</span><a href="concepts.html" class="nav-link">Core Concepts</a></div>
+    <div class="nav-group"><span class="nav-group-label">Reference</span><a href="api-reference.html" class="nav-link">API Reference</a><a href="sdk-python.html" class="nav-link">Python SDK</a><a href="sdk-typescript.html" class="nav-link">TypeScript SDK</a><a href="mcp.html" class="nav-link">MCP Server</a></div>
+    <div class="nav-group"><span class="nav-group-label">Deployment</span><a href="self-hosting.html" class="nav-link">Self-Hosting</a></div>
+    <div class="nav-group"><span class="nav-group-label">Guides</span><a href="integrations.html" class="nav-link">Integrations</a></div>
+  </nav>
+</aside>
+
+<main class="content">
+<article class="content-body">
+
+<h1>API Reference</h1>
+<div class="page-meta"><span>Reference</span><span>·</span><span>All endpoints</span></div>
+
+<p>All endpoints are prefixed with <code>/v1/</code>. Authentication uses the <code>X-API-Key</code> header. Interactive docs are available at <code>http://localhost:8000/docs</code> (Swagger UI) when running locally.</p>
+
+<h3 id="authentication">Authentication</h3>
+<div class="cb">
+  <div class="cb-head"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="cb-file">request header</span></div>
+  <div class="cb-body"><pre><code class="language-bash">X-API-Key: crwl_your_api_key_here</code></pre></div>
+</div>
+
+<div class="callout callout-note">
+  <span class="callout-icon">ℹ️</span>
+  <p>Every endpoint requires a valid API key scoped to the operation. Use scope <code>*</code> for full access during development.</p>
+</div>
+
+<h2 id="agents">Agents</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Method</th><th>Path</th><th>Description</th><th>Scope</th></tr></thead>
+  <tbody>
+    <tr><td><span class="method m-get">GET</span></td><td><span class="mono">/v1/agents</span></td><td>List agents. Query: <code>status</code>, <code>tags</code>, <code>limit</code>, <code>cursor</code></td><td><code>agents:read</code></td></tr>
+    <tr><td><span class="method m-post">POST</span></td><td><span class="mono">/v1/agents</span></td><td>Create agent</td><td><code>agents:write</code></td></tr>
+    <tr><td><span class="method m-get">GET</span></td><td><span class="mono">/v1/agents/{id}</span></td><td>Get agent by ID</td><td><code>agents:read</code></td></tr>
+    <tr><td><span class="method m-patch">PATCH</span></td><td><span class="mono">/v1/agents/{id}</span></td><td>Update name, description, tags, config</td><td><code>agents:write</code></td></tr>
+    <tr><td><span class="method m-delete">DELETE</span></td><td><span class="mono">/v1/agents/{id}</span></td><td>Delete agent and all data</td><td><code>agents:write</code></td></tr>
+    <tr><td><span class="method m-get">GET</span></td><td><span class="mono">/v1/agents/{id}/status</span></td><td>Get cached status (Redis, 60s TTL)</td><td><code>agents:read</code></td></tr>
+    <tr><td><span class="method m-patch">PATCH</span></td><td><span class="mono">/v1/agents/{id}/status</span></td><td>Update status and optional session_id</td><td><code>agents:write</code></td></tr>
+    <tr><td><span class="method m-get">GET</span></td><td><span class="mono">/v1/agents/{id}/status/history</span></td><td>Status transition history. Query: <code>limit</code> (default 20)</td><td><code>agents:read</code></td></tr>
+    <tr><td><span class="method m-post">POST</span></td><td><span class="mono">/v1/agents/{id}/tags</span></td><td>Add tags (<code>{"tags": ["prod"]}</code>)</td><td><code>agents:write</code></td></tr>
+    <tr><td><span class="method m-delete">DELETE</span></td><td><span class="mono">/v1/agents/{id}/tags/{tag}</span></td><td>Remove a tag</td><td><code>agents:write</code></td></tr>
+    <tr><td><span class="method m-get">GET</span></td><td><span class="mono">/v1/agents/{id}/relations</span></td><td>List agent relations</td><td><code>agents:read</code></td></tr>
+    <tr><td><span class="method m-post">POST</span></td><td><span class="mono">/v1/agents/{id}/relations</span></td><td>Add relation: <code>type</code> (supervisor/collaborator/delegate), <code>related_agent_id</code></td><td><code>agents:write</code></td></tr>
+    <tr><td><span class="method m-delete">DELETE</span></td><td><span class="mono">/v1/agents/{id}/relations/{rel_id}</span></td><td>Remove relation</td><td><code>agents:write</code></td></tr>
+    <tr><td><span class="method m-get">GET</span></td><td><span class="mono">/v1/agents/{id}/export</span></td><td>Export agent as streaming JSON (all memories, actions, episodes)</td><td><code>agents:read</code></td></tr>
+    <tr><td><span class="method m-post">POST</span></td><td><span class="mono">/v1/agents/import</span></td><td>Import agent from exported JSON. Atomic with savepoint.</td><td><code>agents:write</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3 id="agent-example">Example: create an agent</h3>
+<div class="cb">
+  <div class="cb-head"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="cb-file">curl</span></div>
+  <div class="cb-body"><pre><code class="language-bash">curl -X POST http://localhost:8000/v1/agents \
+  -H "X-API-Key: crwl_..." \
+  -H "Content-Type: application/json" \
+  -d '{"name": "sales-agent", "tags": ["production"], "config": {"model": "claude-opus-4-8"}}'
+
+# Response
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "name": "sales-agent",
+  "status": "idle",
+  "tags": ["production"],
+  "config": {"model": "claude-opus-4-8"},
+  "created_at": "2025-06-14T12:00:00Z"
+}</code></pre></div>
+</div>
+
+<h2 id="memory">Memory</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><span class="method m-post">POST</span></td><td><span class="mono">/v1/agents/{id}/memory</span></td><td>Save a long-term memory. Body: <code>content</code>, <code>importance</code> (0–1), optional <code>source</code>, <code>session_id</code></td></tr>
+    <tr><td><span class="method m-get">GET</span></td><td><span class="mono">/v1/agents/{id}/memory</span></td><td>List memories. Query: <code>limit</code>, <code>cursor</code>, <code>source</code></td></tr>
+    <tr><td><span class="method m-post">POST</span></td><td><span class="mono">/v1/agents/{id}/memory/recall</span></td><td>Semantic recall. Body: <code>query</code>, <code>limit</code> (default 10), optional <code>min_similarity</code></td></tr>
+    <tr><td><span class="method m-delete">DELETE</span></td><td><span class="mono">/v1/agents/{id}/memory/{memory_id}</span></td><td>Delete a specific memory</td></tr>
+    <tr><td><span class="method m-get">GET</span></td><td><span class="mono">/v1/agents/{id}/memory/stats</span></td><td>Count by source, average importance, oldest/newest</td></tr>
+    <tr><td><span class="method m-post">POST</span></td><td><span class="mono">/v1/agents/{id}/memory/messages</span></td><td>Append short-term message. Body: <code>session_id</code>, <code>role</code>, <code>content</code></td></tr>
+    <tr><td><span class="method m-get">GET</span></td><td><span class="mono">/v1/agents/{id}/memory/messages</span></td><td>Get short-term messages. Query: <code>session_id</code></td></tr>
+    <tr><td><span class="method m-delete">DELETE</span></td><td><span class="mono">/v1/agents/{id}/memory/messages</span></td><td>Clear short-term memory for a session</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3 id="recall-example">Example: semantic recall</h3>
+<div class="cb">
+  <div class="cb-head"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="cb-file">curl</span></div>
+  <div class="cb-body"><pre><code class="language-bash">curl -X POST http://localhost:8000/v1/agents/$AGENT_ID/memory/recall \
+  -H "X-API-Key: crwl_..." \
+  -H "Content-Type: application/json" \
+  -d '{"query": "user language preferences", "limit": 5}'
+
+# Response
+[
+  {
+    "id": "mem-uuid",
+    "content": "User prefers Python over JavaScript",
+    "similarity": 0.94,
+    "importance": 0.9,
+    "source": "extracted",
+    "created_at": "2025-06-10T09:00:00Z"
+  }
+]</code></pre></div>
+</div>
+
+<h2 id="actions">Actions</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><span class="method m-post">POST</span></td><td><span class="mono">/v1/agents/{id}/actions</span></td><td>Log an action. Body: <code>tool_name</code>, <code>input_params</code>, <code>output_result</code>, <code>status</code>, optional <code>duration_ms</code>, <code>session_id</code></td></tr>
+    <tr><td><span class="method m-get">GET</span></td><td><span class="mono">/v1/agents/{id}/actions</span></td><td>List actions. Query: <code>tool</code>, <code>status</code>, <code>limit</code> (default 50, max 500), <code>cursor</code></td></tr>
+    <tr><td><span class="method m-get">GET</span></td><td><span class="mono">/v1/agents/{id}/actions/{action_id}</span></td><td>Get a single action</td></tr>
+    <tr><td><span class="method m-get">GET</span></td><td><span class="mono">/v1/agents/{id}/actions/stats</span></td><td>Aggregated stats: counts, error rate, avg duration by tool</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="sessions">Sessions</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><span class="method m-post">POST</span></td><td><span class="mono">/v1/agents/{id}/sessions</span></td><td>Create session. Body: optional <code>episode_id</code>, <code>metadata</code></td></tr>
+    <tr><td><span class="method m-get">GET</span></td><td><span class="mono">/v1/agents/{id}/sessions</span></td><td>List sessions for agent</td></tr>
+    <tr><td><span class="method m-get">GET</span></td><td><span class="mono">/v1/sessions/{session_id}</span></td><td>Get session details</td></tr>
+    <tr><td><span class="method m-post">POST</span></td><td><span class="mono">/v1/sessions/{session_id}/close</span></td><td>Close session and extract memories from conversation using Claude</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="episodes">Episodes</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><span class="method m-post">POST</span></td><td><span class="mono">/v1/agents/{id}/episodes</span></td><td>Create episode. Body: <code>title</code>, optional <code>description</code></td></tr>
+    <tr><td><span class="method m-get">GET</span></td><td><span class="mono">/v1/agents/{id}/episodes</span></td><td>List episodes</td></tr>
+    <tr><td><span class="method m-get">GET</span></td><td><span class="mono">/v1/agents/{id}/episodes/{episode_id}</span></td><td>Get episode with session list</td></tr>
+    <tr><td><span class="method m-post">POST</span></td><td><span class="mono">/v1/agents/{id}/episodes/{episode_id}/complete</span></td><td>Mark episode complete</td></tr>
+    <tr><td><span class="method m-post">POST</span></td><td><span class="mono">/v1/agents/{id}/episodes/{episode_id}/recall</span></td><td>Semantic recall scoped to this episode's memories</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="context">Context (Blackboard)</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><span class="method m-get">GET</span></td><td><span class="mono">/v1/context/{namespace}</span></td><td>List all keys in namespace</td></tr>
+    <tr><td><span class="method m-get">GET</span></td><td><span class="mono">/v1/context/{namespace}/{key}</span></td><td>Read value (current version)</td></tr>
+    <tr><td><span class="method m-put">PUT</span></td><td><span class="mono">/v1/context/{namespace}/{key}</span></td><td>Write value. Body: <code>{"value": any}</code>. Increments version.</td></tr>
+    <tr><td><span class="method m-delete">DELETE</span></td><td><span class="mono">/v1/context/{namespace}/{key}</span></td><td>Delete key</td></tr>
+    <tr><td><span class="method m-get">GET</span></td><td><span class="mono">/v1/context/{namespace}/{key}/history</span></td><td>Version history for a key</td></tr>
+    <tr><td><span class="method m-post">POST</span></td><td><span class="mono">/v1/context/{namespace}/{key}/rollback</span></td><td>Rollback to a specific version. Body: <code>{"version": 3}</code></td></tr>
+    <tr><td><span class="method m-get">GET</span></td><td><span class="mono">/v1/context/{namespace}/subscribe</span></td><td>SSE stream. Emits events when any key in the namespace changes.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="evaluations">Evaluations</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><span class="method m-post">POST</span></td><td><span class="mono">/v1/agents/{id}/evaluations</span></td><td>Create evaluation. Body: <code>prompt</code>, <code>response</code>, optional <code>expected</code>, <code>session_id</code>, <code>variant</code></td></tr>
+    <tr><td><span class="method m-get">GET</span></td><td><span class="mono">/v1/agents/{id}/evaluations</span></td><td>List evaluations. Query: <code>variant</code>, <code>limit</code>, <code>cursor</code></td></tr>
+    <tr><td><span class="method m-get">GET</span></td><td><span class="mono">/v1/agents/{id}/evaluations/summary</span></td><td>A/B summary: avg score per variant, anomaly counts</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="prompts">Prompts</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><span class="method m-post">POST</span></td><td><span class="mono">/v1/agents/{id}/prompts</span></td><td>Create prompt version. Body: <code>name</code>, <code>content</code>, optional <code>description</code></td></tr>
+    <tr><td><span class="method m-get">GET</span></td><td><span class="mono">/v1/agents/{id}/prompts</span></td><td>List all versions</td></tr>
+    <tr><td><span class="method m-get">GET</span></td><td><span class="mono">/v1/agents/{id}/prompts/{version_id}</span></td><td>Get specific version with diff from previous</td></tr>
+    <tr><td><span class="method m-post">POST</span></td><td><span class="mono">/v1/agents/{id}/prompts/{version_id}/activate</span></td><td>Mark version as active</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="webhooks">Webhooks</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><span class="method m-post">POST</span></td><td><span class="mono">/v1/webhooks</span></td><td>Register webhook. Body: <code>url</code>, <code>events</code> (array), optional <code>secret</code></td></tr>
+    <tr><td><span class="method m-get">GET</span></td><td><span class="mono">/v1/webhooks</span></td><td>List webhooks</td></tr>
+    <tr><td><span class="method m-delete">DELETE</span></td><td><span class="mono">/v1/webhooks/{webhook_id}</span></td><td>Delete webhook</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>Webhook events include: <code>agent.status_changed</code>, <code>memory.extracted</code>, <code>action.error</code>, <code>anomaly.detected</code>.</p>
+
+<h2 id="auth">Auth / API Keys</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><span class="method m-post">POST</span></td><td><span class="mono">/v1/auth/keys</span></td><td>Create API key. Body: <code>name</code>, <code>scopes</code>, optional <code>expires_at</code>, <code>rate_limit</code></td></tr>
+    <tr><td><span class="method m-get">GET</span></td><td><span class="mono">/v1/auth/keys</span></td><td>List API keys (values are never returned after creation)</td></tr>
+    <tr><td><span class="method m-delete">DELETE</span></td><td><span class="mono">/v1/auth/keys/{key_id}</span></td><td>Revoke API key immediately</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="other">Other Endpoints</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><span class="method m-get">GET</span></td><td><span class="mono">/v1/audit</span></td><td>Read-only audit log of all API operations. Query: <code>agent_id</code>, <code>action</code>, <code>limit</code></td></tr>
+    <tr><td><span class="method m-get">GET</span></td><td><span class="mono">/v1/usage</span></td><td>Resource usage counts for the current tenant</td></tr>
+    <tr><td><span class="method m-get">GET</span></td><td><span class="mono">/metrics</span></td><td>Prometheus metrics. Requires <code>Authorization: Bearer METRICS_TOKEN</code> from non-localhost</td></tr>
+    <tr><td><span class="method m-get">GET</span></td><td><span class="mono">/health</span></td><td>Health check: DB + Redis status</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="scopes">Available Scopes</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Scope</th><th>Access</th></tr></thead>
+  <tbody>
+    <tr><td><code>*</code></td><td>All operations (superkey)</td></tr>
+    <tr><td><code>agents:read</code></td><td>Read agents and status</td></tr>
+    <tr><td><code>agents:write</code></td><td>Create, update, delete agents</td></tr>
+    <tr><td><code>memory:read</code></td><td>Read and recall memories</td></tr>
+    <tr><td><code>memory:write</code></td><td>Save and delete memories</td></tr>
+    <tr><td><code>actions:read</code></td><td>Read action log</td></tr>
+    <tr><td><code>actions:write</code></td><td>Log new actions</td></tr>
+    <tr><td><code>context:read</code></td><td>Read blackboard values</td></tr>
+    <tr><td><code>context:write</code></td><td>Write blackboard values</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="page-nav">
+  <a href="concepts.html" class="page-nav-link prev">
+    <span class="page-nav-dir">← Previous</span>
+    <span class="page-nav-title">Core Concepts</span>
+  </a>
+  <a href="sdk-python.html" class="page-nav-link next">
+    <span class="page-nav-dir">Next →</span>
+    <span class="page-nav-title">Python SDK</span>
+  </a>
+</div>
+
+</article>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/bash.min.js"></script>
+<script src="docs.js"></script>
+</body>
+</html>

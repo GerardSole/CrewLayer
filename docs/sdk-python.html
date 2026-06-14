@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Python SDK — CrewLayer Docs</title>
+  <meta name="description" content="Complete reference for the CrewLayer Python SDK." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
+  <link rel="stylesheet" href="docs.css" />
+</head>
+<body>
+<div class="overlay" id="overlay"></div>
+<header class="topbar">
+  <div class="topbar-left">
+    <button class="sidebar-btn" id="sidebarBtn" aria-label="Toggle sidebar">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    </button>
+    <a href="../landing/index.html" class="topbar-logo">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="15" width="18" height="4" rx="2" fill="#22c55e" opacity=".95"/><rect x="3" y="10" width="18" height="4" rx="2" fill="#22c55e" opacity=".6"/><rect x="3" y="5" width="18" height="4" rx="2" fill="#22c55e" opacity=".28"/></svg>CrewLayer
+    </a>
+    <span class="topbar-sep">/</span>
+    <span class="topbar-section">Python SDK</span>
+  </div>
+  <div class="topbar-right">
+    <div class="search-wrap">
+      <svg class="search-icon" width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.5"/><path d="M11 11l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <input type="search" id="docsSearch" class="search-input" placeholder="Search docs…" autocomplete="off" />
+      <div id="searchDrop" class="search-drop hidden"></div>
+    </div>
+    <a href="https://github.com/GerardSole/CrewLayer" class="topbar-gh">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>GitHub
+    </a>
+  </div>
+</header>
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-header"><span class="sidebar-version">v1.0 · MIT License</span></div>
+  <nav class="sidebar-nav">
+    <div class="nav-group"><span class="nav-group-label">Getting Started</span><a href="index.html" class="nav-link">Introduction</a><a href="quickstart.html" class="nav-link">Quick Start</a></div>
+    <div class="nav-group"><span class="nav-group-label">Concepts</span><a href="concepts.html" class="nav-link">Core Concepts</a></div>
+    <div class="nav-group"><span class="nav-group-label">Reference</span><a href="api-reference.html" class="nav-link">API Reference</a><a href="sdk-python.html" class="nav-link">Python SDK</a><a href="sdk-typescript.html" class="nav-link">TypeScript SDK</a><a href="mcp.html" class="nav-link">MCP Server</a></div>
+    <div class="nav-group"><span class="nav-group-label">Deployment</span><a href="self-hosting.html" class="nav-link">Self-Hosting</a></div>
+    <div class="nav-group"><span class="nav-group-label">Guides</span><a href="integrations.html" class="nav-link">Integrations</a></div>
+  </nav>
+</aside>
+
+<main class="content">
+<article class="content-body">
+
+<h1>Python SDK</h1>
+<div class="page-meta"><span>Reference</span><span>·</span><span>Python 3.12+</span></div>
+
+<h2 id="installation">Installation</h2>
+<div class="cb">
+  <div class="cb-head"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="cb-file">terminal</span></div>
+  <div class="cb-body"><pre><code class="language-bash"># Basic install
+pip install crewlayer
+
+# With integration extras
+pip install "crewlayer[langchain]"
+pip install "crewlayer[autogen]"
+pip install "crewlayer[llamaindex]"
+
+# Or all extras
+pip install "crewlayer[all]"
+
+# From source (for local dev)
+git clone https://github.com/GerardSole/CrewLayer
+cd CrewLayer && pip install -e ".[dev]"</code></pre></div>
+</div>
+
+<h2 id="client-init">Client Initialization</h2>
+<div class="cb">
+  <div class="cb-head"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="cb-file">Python</span></div>
+  <div class="cb-body"><pre><code class="language-python">from crewlayer import CrewLayerClient
+
+# Explicit configuration
+client = CrewLayerClient(
+    base_url="http://localhost:8000",   # default: http://localhost:8000
+    api_key="crwl_...",                 # or set CREWLAYER_API_KEY env var
+    timeout=30.0,                       # default: 30s
+)
+
+# From environment variables (CREWLAYER_API_KEY, CREWLAYER_BASE_URL)
+client = CrewLayerClient()</code></pre></div>
+</div>
+
+<h2 id="agents-api">client.agents</h2>
+
+<div class="cb">
+  <div class="cb-head"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="cb-file">agents.py</span></div>
+  <div class="cb-body"><pre><code class="language-python"># Create
+agent = client.agents.create(
+    name="my-agent",
+    description="Sales assistant",
+    tags=["production", "sales"],
+    config={"model": "claude-opus-4-8"},
+)
+agent_id = agent["id"]
+
+# Get
+agent = client.agents.get(agent_id)
+
+# List (with optional filters)
+agents = client.agents.list(status="working", tags="production")
+
+# Update
+agent = client.agents.update(
+    agent_id,
+    name="my-agent-v2",
+    tags=["production", "sales", "v2"],
+)
+
+# Delete
+client.agents.delete(agent_id)
+
+# Status
+status = client.agents.get_status(agent_id)
+# → {"status": "idle", "current_session_id": None, "updated_at": "..."}
+
+client.agents.set_status(agent_id, status="working", session_id="session-uuid")
+
+# Status history
+history = client.agents.status_history(agent_id, limit=20)
+
+# Tags
+client.agents.add_tags(agent_id, tags=["new-tag"])
+client.agents.remove_tag(agent_id, tag="old-tag")</code></pre></div>
+</div>
+
+<h2 id="memory-api">client.memory</h2>
+
+<div class="cb">
+  <div class="cb-head"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="cb-file">memory.py</span></div>
+  <div class="cb-body"><pre><code class="language-python"># Save a long-term memory
+memory = client.memory.save(
+    agent_id=agent_id,
+    content="User is a Python developer who dislikes verbose code.",
+    importance=0.9,        # 0.0–1.0
+    source="manual",       # "manual" | "extracted" | "episode"
+    session_id=session_id, # optional — link to session
+)
+
+# Semantic recall (cosine similarity search)
+memories = client.memory.recall(
+    agent_id=agent_id,
+    query="what are the user's coding preferences?",
+    top_k=5,               # default: 10
+    min_similarity=0.7,    # optional threshold
+)
+for m in memories:
+    print(f"[{m['similarity']:.2f}] {m['content']}")
+
+# List all memories (paginated)
+page = client.memory.list(agent_id=agent_id, limit=20)
+memories = page["items"]
+cursor   = page["next_cursor"]  # pass to next call for pagination
+
+# Delete a memory
+client.memory.delete(agent_id=agent_id, memory_id="mem-uuid")
+
+# Stats
+stats = client.memory.stats(agent_id=agent_id)
+# → {"total": 42, "by_source": {...}, "avg_importance": 0.78}
+
+# Short-term memory (Redis messages)
+client.memory.append_message(
+    agent_id=agent_id,
+    session_id=session_id,
+    role="user",            # "user" | "assistant" | "system"
+    content="Hello, how are you?",
+)
+messages = client.memory.get_messages(agent_id=agent_id, session_id=session_id)
+client.memory.clear_messages(agent_id=agent_id, session_id=session_id)</code></pre></div>
+</div>
+
+<h2 id="actions-api">client.actions</h2>
+
+<div class="cb">
+  <div class="cb-head"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="cb-file">actions.py</span></div>
+  <div class="cb-body"><pre><code class="language-python">import time
+
+# Log a tool call
+start = time.monotonic()
+result = my_tool(input_data)  # your tool call
+duration_ms = int((time.monotonic() - start) * 1000)
+
+action = client.actions.log(
+    agent_id=agent_id,
+    tool_name="web_search",
+    input_params={"query": "latest AI news"},
+    output_result={"results": result},
+    status="success",       # "success" | "error" | "timeout"
+    duration_ms=duration_ms,
+    session_id=session_id,  # optional
+)
+
+# List actions (cursor-based pagination)
+page = client.actions.list(
+    agent_id=agent_id,
+    tool="web_search",      # optional filter
+    status="error",         # optional filter
+    limit=50,
+)
+actions = page["items"]
+
+# Get a single action
+action = client.actions.get(agent_id=agent_id, action_id="action-uuid")
+
+# Aggregated stats
+stats = client.actions.stats(agent_id=agent_id)
+# → {"total": 120, "error_rate": 0.05, "by_tool": {...}, "avg_duration_ms": 342}</code></pre></div>
+</div>
+
+<h2 id="sessions-api">client.sessions</h2>
+
+<div class="cb">
+  <div class="cb-head"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="cb-file">sessions.py</span></div>
+  <div class="cb-body"><pre><code class="language-python"># Create a new session at the start of a conversation
+session = client.sessions.create(
+    agent_id=agent_id,
+    episode_id="episode-uuid",  # optional
+    metadata={"user_id": "u_123"},
+)
+session_id = session["id"]
+
+# Update agent status to working with this session
+client.agents.set_status(agent_id, status="working", session_id=session_id)
+
+# ... conversation happens ...
+
+# Close the session — extracts memories from the conversation
+result = client.sessions.close(session_id)
+# Claude reads all messages and persists new long-term memories
+print(f"Extracted {result['memories_extracted']} new memories")
+
+# Reset agent status
+client.agents.set_status(agent_id, status="idle")</code></pre></div>
+</div>
+
+<h2 id="context-api">client.context</h2>
+
+<div class="cb">
+  <div class="cb-head"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="cb-file">context.py</span></div>
+  <div class="cb-body"><pre><code class="language-python"># Write to the blackboard
+entry = client.context.write(
+    namespace="pipeline",
+    key="step_1_output",
+    value={"items": ["a", "b", "c"], "count": 3},
+)
+print(f"Version {entry['version']}")
+
+# Read from the blackboard
+entry = client.context.read(namespace="pipeline", key="step_1_output")
+print(entry["value"])  # {"items": [...], "count": 3}
+
+# List all keys in a namespace
+keys = client.context.list_namespace(namespace="pipeline")
+
+# Version history
+history = client.context.history(namespace="pipeline", key="step_1_output")
+
+# Rollback to a previous version
+client.context.rollback(namespace="pipeline", key="step_1_output", version=2)</code></pre></div>
+</div>
+
+<h2 id="episodes-api">client.episodes</h2>
+
+<div class="cb">
+  <div class="cb-head"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="cb-file">episodes.py</span></div>
+  <div class="cb-body"><pre><code class="language-python"># Create an episode (a long-running task)
+episode = client.episodes.create(
+    agent_id=agent_id,
+    title="Implement authentication feature",
+    description="All sessions related to auth work",
+)
+episode_id = episode["id"]
+
+# Recall memories scoped to this episode
+memories = client.episodes.recall(
+    agent_id=agent_id,
+    episode_id=episode_id,
+    query="what decisions were made about JWT expiry?",
+    top_k=5,
+)
+
+# Complete when done
+client.episodes.complete(agent_id=agent_id, episode_id=episode_id)</code></pre></div>
+</div>
+
+<h2 id="integrations">Integration extras</h2>
+
+<h3 id="langchain-extra">LangChain <code>[langchain]</code></h3>
+<div class="cb">
+  <div class="cb-head"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="cb-file">langchain_integration.py</span></div>
+  <div class="cb-body"><pre><code class="language-python">from crewlayer.integrations.langchain import CrewLayerMemory, CrewLayerCallbackHandler
+
+# Drop-in memory for any LangChain chain
+memory = CrewLayerMemory(client=client, agent_id=agent_id, session_id=session_id)
+
+# Callback handler — auto-logs every chain step as a CrewLayer action
+handler = CrewLayerCallbackHandler(client=client, agent_id=agent_id)
+
+from langchain.chains import ConversationChain
+chain = ConversationChain(memory=memory, callbacks=[handler])</code></pre></div>
+</div>
+
+<h3 id="autogen-extra">AutoGen <code>[autogen]</code></h3>
+<div class="cb">
+  <div class="cb-head"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="cb-file">autogen_integration.py</span></div>
+  <div class="cb-body"><pre><code class="language-python">from crewlayer.integrations.autogen import CrewLayerMemoryMixin
+
+class MyAssistant(CrewLayerMemoryMixin, autogen.AssistantAgent):
+    """Assistant with automatic memory recall and action logging."""
+    pass
+
+assistant = MyAssistant(
+    name="assistant",
+    crewlayer_client=client,
+    crewlayer_agent_id=agent_id,
+)</code></pre></div>
+</div>
+
+<div class="page-nav">
+  <a href="api-reference.html" class="page-nav-link prev">
+    <span class="page-nav-dir">← Previous</span>
+    <span class="page-nav-title">API Reference</span>
+  </a>
+  <a href="sdk-typescript.html" class="page-nav-link next">
+    <span class="page-nav-dir">Next →</span>
+    <span class="page-nav-title">TypeScript SDK</span>
+  </a>
+</div>
+
+</article>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/bash.min.js"></script>
+<script src="docs.js"></script>
+</body>
+</html>

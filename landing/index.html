@@ -1,0 +1,1371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CrewLayer — The memory layer for AI agents</title>
+  <meta name="description" content="Persistent memory, shared context, and full action history for any agent framework. Drop-in backend in minutes." />
+  <meta property="og:title" content="CrewLayer — The memory layer for AI agents" />
+  <meta property="og:description" content="Persistent memory, shared context, and full action history for any agent framework. Drop-in backend in minutes." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://crewlayer.dev" />
+  <meta property="og:image" content="https://crewlayer.dev/og.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="CrewLayer — The memory layer for AI agents" />
+  <meta name="twitter:description" content="Persistent memory, shared context, and full action history for any agent framework." />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/bash.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/typescript.min.js"></script>
+
+  <style>
+    /* ── Reset ─────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:           #0a0a0a;
+      --card:         #111111;
+      --border:       #1e1e1e;
+      --text:         #f5f5f5;
+      --muted:        #888888;
+      --accent:       #22c55e;
+      --accent-dim:   rgba(34,197,94,0.08);
+      --accent-border:rgba(34,197,94,0.25);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    h1, h2, h3 { line-height: 1.15; letter-spacing: -0.02em; }
+
+    /* ── Layout ────────────────────────────────────────────── */
+    .container { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+
+    /* ── Scroll animations ──────────────────────────────────── */
+    .fi {
+      opacity: 0;
+      transform: translateY(22px);
+      transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+    .fi.v  { opacity: 1; transform: none; }
+    .fi.d1 { transition-delay: 0.08s; }
+    .fi.d2 { transition-delay: 0.16s; }
+    .fi.d3 { transition-delay: 0.24s; }
+    .fi.d4 { transition-delay: 0.32s; }
+    .fi.d5 { transition-delay: 0.40s; }
+    .fi.d6 { transition-delay: 0.48s; }
+
+    /* ── NAV ───────────────────────────────────────────────── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      background: rgba(10,10,10,0.72);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-inner {
+      display: flex; align-items: center;
+      justify-content: space-between; height: 58px;
+    }
+
+    .nav-logo {
+      display: flex; align-items: center; gap: 9px;
+      text-decoration: none; color: var(--text);
+      font-weight: 700; font-size: 17px; letter-spacing: -0.03em;
+    }
+
+    .nav-links {
+      display: flex; align-items: center;
+      gap: 28px; list-style: none;
+    }
+
+    .nav-links a {
+      text-decoration: none; color: var(--muted);
+      font-size: 14px; font-weight: 500;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--text); }
+
+    .nav-cta {
+      text-decoration: none; color: var(--text); font-size: 14px;
+      font-weight: 500; border: 1px solid rgba(245,245,245,0.28);
+      padding: 7px 16px; border-radius: 7px;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .nav-cta:hover { border-color: rgba(245,245,245,0.6); background: rgba(245,245,245,0.04); }
+
+    .nav-toggle {
+      display: none; background: none; border: none;
+      color: var(--text); cursor: pointer; padding: 4px;
+    }
+
+    @media (max-width: 720px) {
+      .nav-links, .nav-cta { display: none; }
+      .nav-toggle { display: flex; }
+      nav.open .nav-links {
+        display: flex; flex-direction: column; align-items: flex-start;
+        position: fixed; top: 58px; left: 0; right: 0;
+        background: #0f0f0f; border-bottom: 1px solid var(--border);
+        padding: 20px 24px 28px; gap: 18px;
+      }
+      nav.open .nav-cta {
+        display: block; margin: 0 24px 24px; text-align: center;
+        position: fixed; top: 58px; right: 0; left: 0;
+        /* stack after links — handled by JS offsetting */
+      }
+    }
+
+    /* ── Buttons ────────────────────────────────────────────── */
+    .btn-white {
+      display: inline-flex; align-items: center; gap: 6px;
+      text-decoration: none; background: var(--text); color: var(--bg);
+      font-size: 14px; font-weight: 600; padding: 10px 22px;
+      border-radius: 7px; font-family: inherit;
+      transition: opacity 0.2s;
+    }
+    .btn-white:hover { opacity: 0.88; }
+
+    .btn-outline {
+      display: inline-flex; align-items: center; gap: 8px;
+      text-decoration: none; color: var(--text);
+      font-size: 14px; font-weight: 500; padding: 10px 22px;
+      border-radius: 7px; border: 1px solid var(--border);
+      font-family: inherit; transition: border-color 0.2s, background 0.2s;
+    }
+    .btn-outline:hover { border-color: rgba(245,245,245,0.22); background: rgba(245,245,245,0.04); }
+
+    .btn-row {
+      display: flex; align-items: center; justify-content: center;
+      gap: 12px; flex-wrap: wrap;
+    }
+
+    /* ── Code block ─────────────────────────────────────────── */
+    .cb {
+      background: #0c0c0c; border: 1px solid var(--border);
+      border-radius: 10px; overflow: hidden; text-align: left;
+    }
+
+    .cb-head {
+      display: flex; align-items: center; gap: 6px;
+      padding: 11px 16px; border-bottom: 1px solid var(--border);
+    }
+
+    .dot { width: 10px; height: 10px; border-radius: 50%; }
+    .dot-r { background: #ff5f57; }
+    .dot-y { background: #febc2e; }
+    .dot-g { background: #28c840; }
+    .cb-file { font-size: 11.5px; color: var(--muted); margin-left: 8px; }
+
+    .cb-body { padding: 20px; }
+    .cb pre { margin: 0; background: transparent !important; padding: 0 !important; }
+    .cb code {
+      font-size: 13px; line-height: 1.75;
+      font-family: 'JetBrains Mono', 'Fira Code', 'Menlo', monospace;
+    }
+
+    /* ── Section common ─────────────────────────────────────── */
+    .section { padding: 96px 0; }
+
+    .s-label {
+      font-size: 11.5px; font-weight: 600; color: var(--accent);
+      text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 10px;
+    }
+
+    .s-title {
+      font-size: clamp(28px, 3.8vw, 44px);
+      font-weight: 700; margin-bottom: 14px;
+    }
+
+    .s-sub {
+      font-size: 16.5px; color: var(--muted);
+      max-width: 500px; line-height: 1.65;
+    }
+
+    /* ── HERO ───────────────────────────────────────────────── */
+    #hero {
+      padding: 148px 0 104px;
+      text-align: center;
+    }
+
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 7px;
+      font-size: 12px; font-weight: 500;
+      color: var(--accent);
+      background: var(--accent-dim);
+      border: 1px solid var(--accent-border);
+      padding: 5px 13px; border-radius: 100px;
+      margin-bottom: 28px;
+    }
+    .hero-badge::before {
+      content: '';
+      width: 6px; height: 6px;
+      background: var(--accent); border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    #hero h1 {
+      font-size: clamp(38px, 5.8vw, 68px);
+      font-weight: 800; max-width: 780px;
+      margin: 0 auto 20px;
+      background: linear-gradient(175deg, #f5f5f5 30%, #555 120%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero-sub {
+      font-size: 19px; color: var(--muted);
+      max-width: 540px; margin: 0 auto 36px;
+      font-weight: 400; line-height: 1.65;
+    }
+
+    .hero-code { max-width: 600px; margin: 0 auto 32px; }
+
+    .hero-stats {
+      display: flex; align-items: center; justify-content: center;
+      gap: 16px; flex-wrap: wrap;
+      font-size: 13px; color: var(--muted);
+    }
+    .hero-stats-sep { color: #2e2e2e; }
+
+    /* ── LOGOS ──────────────────────────────────────────────── */
+    #logos {
+      padding: 44px 0;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .logos-label {
+      text-align: center; font-size: 11px; font-weight: 600;
+      color: var(--muted); text-transform: uppercase;
+      letter-spacing: 0.09em; margin-bottom: 22px;
+    }
+
+    .logos-row {
+      display: flex; align-items: center;
+      justify-content: center; gap: 10px; flex-wrap: wrap;
+    }
+
+    .logo-pill {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 7px 15px; border: 1px solid var(--border);
+      border-radius: 100px; font-size: 13px; font-weight: 500;
+      color: #777; background: var(--card);
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .logo-pill:hover { border-color: #2e2e2e; color: var(--text); }
+    .logo-dot { width: 6px; height: 6px; border-radius: 50%; background: #333; }
+
+    /* ── FEATURES GRID ──────────────────────────────────────── */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    @media (max-width: 860px) { .features-grid { grid-template-columns: repeat(2,1fr); } }
+    @media (max-width: 520px) { .features-grid { grid-template-columns: 1fr; } }
+
+    .feature-card {
+      padding: 28px 26px;
+      border-right: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      background: var(--card);
+      transition: background 0.25s;
+    }
+    .feature-card:hover { background: #141414; }
+    .features-grid .feature-card:nth-child(3n) { border-right: none; }
+    .features-grid .feature-card:nth-last-child(-n+3) { border-bottom: none; }
+    @media (max-width: 860px) {
+      .features-grid .feature-card:nth-child(3n) { border-right: 1px solid var(--border); }
+      .features-grid .feature-card:nth-child(2n) { border-right: none; }
+      .features-grid .feature-card:nth-last-child(-n+3) { border-bottom: 1px solid var(--border); }
+      .features-grid .feature-card:nth-last-child(-n+2) { border-bottom: none; }
+    }
+    @media (max-width: 520px) {
+      .features-grid .feature-card { border-right: none; }
+      .features-grid .feature-card:last-child { border-bottom: none; }
+      .features-grid .feature-card:nth-last-child(-n+2) { border-bottom: 1px solid var(--border); }
+    }
+
+    .feature-icon { font-size: 22px; margin-bottom: 14px; }
+    .feature-title { font-size: 15px; font-weight: 600; margin-bottom: 8px; }
+    .feature-desc { font-size: 13.5px; color: var(--muted); line-height: 1.6; }
+
+    /* ── HOW IT WORKS ───────────────────────────────────────── */
+    #how {
+      background: var(--card);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .how-inner {
+      display: grid; grid-template-columns: 1fr 1.1fr;
+      gap: 80px; align-items: start;
+    }
+    @media (max-width: 760px) { .how-inner { grid-template-columns: 1fr; gap: 48px; } }
+
+    .how-steps { display: flex; flex-direction: column; margin-top: 36px; }
+
+    .how-step {
+      display: flex; gap: 18px;
+      padding-bottom: 32px; position: relative;
+    }
+    .how-step:last-child { padding-bottom: 0; }
+
+    .how-step-l {
+      display: flex; flex-direction: column; align-items: center;
+    }
+
+    .step-num {
+      width: 34px; height: 34px; border-radius: 50%;
+      border: 1px solid var(--border); background: var(--bg);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700; color: var(--accent);
+      flex-shrink: 0; z-index: 1;
+    }
+
+    .step-line {
+      width: 1px; flex: 1; background: var(--border); margin-top: 6px;
+    }
+    .how-step:last-child .step-line { display: none; }
+
+    .step-body { padding-top: 5px; }
+    .step-title { font-size: 15px; font-weight: 600; margin-bottom: 5px; }
+    .step-desc { font-size: 13.5px; color: var(--muted); line-height: 1.6; }
+
+    /* ── EXPANDED FEATURES ──────────────────────────────────── */
+    .check-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 0 72px; margin-top: 48px;
+    }
+    @media (max-width: 680px) { .check-grid { grid-template-columns: 1fr; } }
+
+    .check-item {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 12px 0; border-bottom: 1px solid var(--border);
+    }
+    .check-item:last-child { border-bottom: none; }
+
+    .check-ico {
+      width: 16px; height: 16px; flex-shrink: 0;
+      margin-top: 3px; color: var(--accent);
+    }
+    .check-lbl { font-size: 14px; font-weight: 500; line-height: 1.5; }
+
+    /* ── INTEGRATIONS ───────────────────────────────────────── */
+    #integrations {
+      background: var(--card);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tabs {
+      display: flex; gap: 2px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 28px; margin-top: 40px;
+    }
+
+    .tab-btn {
+      background: none; border: none; color: var(--muted);
+      font-size: 14px; font-weight: 500; padding: 10px 16px;
+      cursor: pointer; font-family: inherit;
+      border-bottom: 2px solid transparent; margin-bottom: -1px;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active { color: var(--text); border-bottom-color: var(--accent); }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    .int-desc {
+      font-size: 13.5px; color: var(--muted); margin-bottom: 16px;
+    }
+
+    /* ── DASHBOARD ──────────────────────────────────────────── */
+    .dash-inner {
+      display: grid; grid-template-columns: 1fr 1.4fr;
+      gap: 72px; align-items: center;
+    }
+    @media (max-width: 760px) { .dash-inner { grid-template-columns: 1fr; gap: 40px; } }
+
+    .dash-feat-list { display: flex; flex-direction: column; margin-top: 26px; }
+    .dash-feat {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 0; border-bottom: 1px solid var(--border);
+      font-size: 14px; color: var(--muted);
+    }
+    .dash-feat:last-child { border-bottom: none; }
+    .dash-feat svg { color: var(--accent); flex-shrink: 0; }
+
+    .dash-mockup {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; overflow: hidden;
+    }
+
+    .mockup-head {
+      display: flex; align-items: center; gap: 6px;
+      padding: 11px 16px; border-bottom: 1px solid var(--border);
+      background: #0d0d0d;
+    }
+
+    .mockup-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 16px; border-bottom: 1px solid var(--border);
+      font-size: 12px;
+    }
+    .mockup-row:last-child { border-bottom: none; }
+
+    .agent-avatar {
+      width: 28px; height: 28px; border-radius: 6px;
+      background: #1a1a1a; display: flex;
+      align-items: center; justify-content: center; font-size: 13px;
+      flex-shrink: 0;
+    }
+
+    .agent-info { flex: 1; min-width: 0; }
+    .agent-name { font-size: 12px; font-weight: 500; }
+    .agent-id { font-size: 11px; color: var(--muted); }
+
+    .status-badge {
+      font-size: 10px; padding: 3px 8px; border-radius: 4px;
+      font-weight: 600; flex-shrink: 0;
+    }
+    .status-idle    { background: rgba(34,197,94,0.12);  color: #22c55e; }
+    .status-working { background: rgba(251,191,36,0.12); color: #fbbf24; }
+    .status-error   { background: rgba(239,68,68,0.12);  color: #ef4444; }
+
+    .ts { font-size: 11px; color: var(--muted); }
+
+    .mockup-foot {
+      padding: 11px 16px;
+      display: flex; justify-content: space-between; align-items: center;
+      border-top: 1px solid var(--border);
+    }
+
+    /* ── SELF-HOST ──────────────────────────────────────────── */
+    #selfhost {
+      background: var(--card);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .sh-inner {
+      display: grid; grid-template-columns: 1fr 1.2fr;
+      gap: 80px; align-items: center;
+    }
+    @media (max-width: 760px) { .sh-inner { grid-template-columns: 1fr; gap: 40px; } }
+
+    .pills-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 24px; }
+
+    .pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 12px; border: 1px solid var(--accent-border);
+      border-radius: 100px; font-size: 12px; font-weight: 500;
+      color: var(--accent); background: var(--accent-dim);
+    }
+
+    /* ── COMPARISON ─────────────────────────────────────────── */
+    .cmp-wrap {
+      overflow-x: auto; border: 1px solid var(--border);
+      border-radius: 12px; margin-top: 48px;
+    }
+
+    .cmp-table {
+      width: 100%; border-collapse: collapse; min-width: 620px;
+    }
+
+    .cmp-table th {
+      padding: 15px 20px; font-size: 13px; font-weight: 600;
+      text-align: center; border-bottom: 1px solid var(--border);
+      background: var(--card); white-space: nowrap;
+    }
+    .cmp-table th:first-child { text-align: left; width: 38%; }
+    .cmp-table th.hl { background: rgba(34,197,94,0.06); color: var(--accent); }
+
+    .cmp-table td {
+      padding: 12px 20px; font-size: 13px;
+      text-align: center; border-bottom: 1px solid var(--border);
+      color: var(--muted);
+    }
+    .cmp-table td:first-child { text-align: left; color: var(--text); font-weight: 500; }
+    .cmp-table td.hl { background: rgba(34,197,94,0.025); }
+    .cmp-table tr:last-child td { border-bottom: none; }
+
+    .cy { color: var(--accent); font-size: 15px; }
+    .cn { color: #3a3a3a; font-size: 15px; }
+    .cp { color: #fbbf24; font-size: 12px; font-weight: 600; }
+
+    /* ── CTA FINAL ──────────────────────────────────────────── */
+    #cta {
+      background: #0e0e0e;
+      border-top: 1px solid var(--border);
+      padding: 112px 0;
+      text-align: center;
+    }
+
+    #cta h2 {
+      font-size: clamp(34px, 5vw, 56px);
+      font-weight: 800; margin-bottom: 14px;
+      background: linear-gradient(175deg, #f5f5f5 30%, #555 130%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    #cta .cta-sub { font-size: 17px; color: var(--muted); margin-bottom: 36px; }
+
+    .cta-note {
+      display: block; margin-top: 20px;
+      font-size: 13px; color: var(--muted); text-decoration: none;
+      transition: color 0.2s;
+    }
+    .cta-note:hover { color: var(--text); }
+
+    /* ── FOOTER ─────────────────────────────────────────────── */
+    footer { padding: 60px 0 36px; border-top: 1px solid var(--border); }
+
+    .footer-grid {
+      display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr;
+      gap: 48px; padding-bottom: 48px;
+      border-bottom: 1px solid var(--border);
+    }
+    @media (max-width: 760px) { .footer-grid { grid-template-columns: 1fr 1fr; gap: 32px; } }
+    @media (max-width: 440px) { .footer-grid { grid-template-columns: 1fr; } }
+
+    .footer-tagline { font-size: 13px; color: var(--muted); margin-top: 10px; line-height: 1.6; }
+
+    .footer-col-title {
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.09em; color: var(--muted); margin-bottom: 16px;
+    }
+
+    .footer-links { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+    .footer-links a {
+      text-decoration: none; color: var(--muted); font-size: 14px;
+      transition: color 0.2s;
+    }
+    .footer-links a:hover { color: var(--text); }
+
+    .footer-bottom {
+      display: flex; align-items: center; justify-content: space-between;
+      padding-top: 24px; font-size: 13px; color: var(--muted);
+      flex-wrap: wrap; gap: 8px;
+    }
+
+    /* ── hljs overrides ─────────────────────────────────────── */
+    .hljs { background: transparent !important; }
+  </style>
+</head>
+<body>
+
+<!-- ─────────────────────────────────────────────────────────── NAV -->
+<nav id="nav">
+  <div class="container nav-inner">
+    <a href="#" class="nav-logo">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+        <rect x="3" y="15" width="18" height="4" rx="2" fill="#22c55e" opacity="0.95"/>
+        <rect x="3" y="10" width="18" height="4" rx="2" fill="#22c55e" opacity="0.6"/>
+        <rect x="3" y="5"  width="18" height="4" rx="2" fill="#22c55e" opacity="0.28"/>
+      </svg>
+      CrewLayer
+    </a>
+
+    <button class="nav-toggle" id="navToggle" aria-label="Toggle menu">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+        <path d="M3 5.5h14M3 10h14M3 14.5h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+    </button>
+
+    <ul class="nav-links" id="navLinks">
+      <li><a href="docs/index.html">Docs</a></li>
+      <li><a href="https://github.com/GerardSole/CrewLayer">GitHub</a></li>
+    </ul>
+
+    <a href="docs/quickstart.html" class="nav-cta">Get Started →</a>
+  </div>
+</nav>
+
+<!-- ─────────────────────────────────────────────────────────── HERO -->
+<section id="hero">
+  <div class="container">
+    <div class="hero-badge fi">Open source · Self-hosteable · MIT License</div>
+
+    <h1 class="fi d1">The memory layer your AI agents have been missing</h1>
+
+    <p class="hero-sub fi d2">
+      Persistent memory, shared context, and full action history for any agent framework.
+      Drop-in backend in minutes.
+    </p>
+
+    <div class="btn-row fi d3" style="margin-bottom:48px;">
+      <a href="#" class="btn-white">Get Started →</a>
+      <a href="https://github.com/GerardSole/CrewLayer" class="btn-outline">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+        </svg>
+        View on GitHub
+      </a>
+    </div>
+
+    <div class="hero-code fi d4">
+      <div class="cb">
+        <div class="cb-head">
+          <div class="dot dot-r"></div>
+          <div class="dot dot-y"></div>
+          <div class="dot dot-g"></div>
+          <span class="cb-file">terminal</span>
+        </div>
+        <div class="cb-body">
+          <pre><code class="language-bash">git clone https://github.com/GerardSole/CrewLayer
+cd CrewLayer && cp .env.example .env
+docker compose up -d
+# ✓  API ready at http://localhost:8000
+# ✓  Dashboard at  http://localhost:8000/dashboard</code></pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="hero-stats fi d5">
+      <span>441 tests passing</span>
+      <span class="hero-stats-sep">·</span>
+      <span>MIT License</span>
+      <span class="hero-stats-sep">·</span>
+      <span>Self-hosteable</span>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────────── LOGOS BAR -->
+<section id="logos">
+  <div class="container">
+    <p class="logos-label fi">Works with your stack</p>
+    <div class="logos-row fi d1">
+      <div class="logo-pill"><div class="logo-dot"></div>LangChain</div>
+      <div class="logo-pill"><div class="logo-dot"></div>AutoGen</div>
+      <div class="logo-pill"><div class="logo-dot"></div>LlamaIndex</div>
+      <div class="logo-pill"><div class="logo-dot"></div>CrewAI</div>
+      <div class="logo-pill"><div class="logo-dot"></div>Vercel AI</div>
+      <div class="logo-pill"><div class="logo-dot"></div>Claude</div>
+      <div class="logo-pill"><div class="logo-dot"></div>OpenAI</div>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────────────────────────────────────────── FEATURES GRID -->
+<section class="section" id="features">
+  <div class="container">
+    <div style="text-align:center;margin-bottom:52px;">
+      <p class="s-label fi">Features</p>
+      <h2 class="s-title fi d1">Everything your agent needs to remember</h2>
+      <p class="s-sub fi d2" style="margin:0 auto;">
+        One backend. Every capability you need to ship production-grade agents.
+      </p>
+    </div>
+
+    <div class="features-grid">
+      <div class="feature-card fi">
+        <div class="feature-icon">🧠</div>
+        <h3 class="feature-title">Persistent Memory</h3>
+        <p class="feature-desc">Short-term in Redis, long-term in pgvector. Semantic recall by similarity. Auto-extracted from conversations with Claude.</p>
+      </div>
+      <div class="feature-card fi d1">
+        <div class="feature-icon">📋</div>
+        <h3 class="feature-title">Action Logger</h3>
+        <p class="feature-desc">Immutable append-only log of every tool call. Debug, audit, and replay any agent action with full input/output context.</p>
+      </div>
+      <div class="feature-card fi d2">
+        <div class="feature-icon">🗒️</div>
+        <h3 class="feature-title">Shared Blackboard</h3>
+        <p class="feature-desc">Key-value store for multi-agent coordination with real-time pub/sub over Redis. Agents communicate without polling.</p>
+      </div>
+      <div class="feature-card fi d3">
+        <div class="feature-icon">🔑</div>
+        <h3 class="feature-title">Multi-tenant</h3>
+        <p class="feature-desc">Every resource isolated per tenant. API key auth with granular scopes. Built for teams and SaaS products from day one.</p>
+      </div>
+      <div class="feature-card fi d4">
+        <div class="feature-icon">📊</div>
+        <h3 class="feature-title">Evaluations</h3>
+        <p class="feature-desc">Rate agent responses, detect anomalies automatically, and run A/B tests on prompts with built-in LLM-as-a-judge scoring.</p>
+      </div>
+      <div class="feature-card fi d5">
+        <div class="feature-icon">🔌</div>
+        <h3 class="feature-title">MCP Server</h3>
+        <p class="feature-desc">Use CrewLayer directly from Claude Code and Claude Desktop as MCP tools. No HTTP code. Just call the tools.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ──────────────────────────────────────────────── HOW IT WORKS -->
+<section class="section" id="how">
+  <div class="container">
+    <div class="how-inner">
+      <div>
+        <p class="s-label fi">How it works</p>
+        <h2 class="s-title fi d1">Your agent. Your framework. Our memory.</h2>
+        <p class="s-sub fi d2">
+          CrewLayer sits behind your agent as a stateful backend.
+          You bring the logic; we handle everything else.
+        </p>
+
+        <div class="how-steps">
+          <div class="how-step fi d2">
+            <div class="how-step-l">
+              <div class="step-num">1</div>
+              <div class="step-line"></div>
+            </div>
+            <div class="step-body">
+              <h3 class="step-title">Create an agent</h3>
+              <p class="step-desc">Register your agent in CrewLayer to get a unique agent_id. One API call — that's it.</p>
+            </div>
+          </div>
+          <div class="how-step fi d3">
+            <div class="how-step-l">
+              <div class="step-num">2</div>
+              <div class="step-line"></div>
+            </div>
+            <div class="step-body">
+              <h3 class="step-title">Connect your framework</h3>
+              <p class="step-desc">Use our Python SDK, TypeScript SDK, REST API, or MCP server. Works with any agent framework.</p>
+            </div>
+          </div>
+          <div class="how-step fi d4">
+            <div class="how-step-l">
+              <div class="step-num">3</div>
+              <div class="step-line"></div>
+            </div>
+            <div class="step-body">
+              <h3 class="step-title">Everything persists</h3>
+              <p class="step-desc">Memories, actions, and context are stored automatically. Your agent remembers across every session.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="fi d2">
+        <div class="cb">
+          <div class="cb-head">
+            <div class="dot dot-r"></div>
+            <div class="dot dot-y"></div>
+            <div class="dot dot-g"></div>
+            <span class="cb-file">agent.py</span>
+          </div>
+          <div class="cb-body">
+            <pre><code class="language-python">from crewlayer import CrewLayerClient
+
+client = CrewLayerClient(api_key="crwl_...")
+
+# Your agent learns something important
+client.memory.save(
+    agent_id="...",
+    content="User prefers concise answers",
+    importance=0.9
+)
+
+# Next session — it remembers
+memories = client.memory.recall(
+    agent_id="...",
+    query="user preferences"
+)
+# → [{"content": "User prefers concise answers",
+#      "similarity": 0.97}]
+
+# Log every tool call automatically
+client.actions.log(
+    agent_id="...",
+    tool_name="web_search",
+    input_params={"query": "latest AI news"},
+    output_result={"count": 12},
+    status="success"
+)</code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ──────────────────────────────────────────── EXPANDED FEATURES -->
+<section class="section" id="expanded">
+  <div class="container">
+    <p class="s-label fi">Production ready</p>
+    <h2 class="s-title fi d1">Built for production from day one</h2>
+    <p class="s-sub fi d2">No toy features. Every capability is production-grade and covered by 441 tests.</p>
+
+    <div class="check-grid">
+      <div>
+        <div class="check-item fi">
+          <svg class="check-ico" viewBox="0 0 16 16" fill="currentColor"><path d="M13.485 1.929l-8.485 8.485-3.485-3.485-1.414 1.414 4.899 4.899 9.899-9.899z"/></svg>
+          <span class="check-lbl">Semantic search with pgvector</span>
+        </div>
+        <div class="check-item fi d1">
+          <svg class="check-ico" viewBox="0 0 16 16" fill="currentColor"><path d="M13.485 1.929l-8.485 8.485-3.485-3.485-1.414 1.414 4.899 4.899 9.899-9.899z"/></svg>
+          <span class="check-lbl">Automatic memory extraction with Claude</span>
+        </div>
+        <div class="check-item fi d2">
+          <svg class="check-ico" viewBox="0 0 16 16" fill="currentColor"><path d="M13.485 1.929l-8.485 8.485-3.485-3.485-1.414 1.414 4.899 4.899 9.899-9.899z"/></svg>
+          <span class="check-lbl">Memory decay and deduplication</span>
+        </div>
+        <div class="check-item fi d3">
+          <svg class="check-ico" viewBox="0 0 16 16" fill="currentColor"><path d="M13.485 1.929l-8.485 8.485-3.485-3.485-1.414 1.414 4.899 4.899 9.899-9.899z"/></svg>
+          <span class="check-lbl">Episode grouping across sessions</span>
+        </div>
+        <div class="check-item fi d4">
+          <svg class="check-ico" viewBox="0 0 16 16" fill="currentColor"><path d="M13.485 1.929l-8.485 8.485-3.485-3.485-1.414 1.414 4.899 4.899 9.899-9.899z"/></svg>
+          <span class="check-lbl">Prompt version control with diff and rollback</span>
+        </div>
+      </div>
+      <div>
+        <div class="check-item fi">
+          <svg class="check-ico" viewBox="0 0 16 16" fill="currentColor"><path d="M13.485 1.929l-8.485 8.485-3.485-3.485-1.414 1.414 4.899 4.899 9.899-9.899z"/></svg>
+          <span class="check-lbl">Real-time anomaly detection</span>
+        </div>
+        <div class="check-item fi d1">
+          <svg class="check-ico" viewBox="0 0 16 16" fill="currentColor"><path d="M13.485 1.929l-8.485 8.485-3.485-3.485-1.414 1.414 4.899 4.899 9.899-9.899z"/></svg>
+          <span class="check-lbl">A/B testing for agent configurations</span>
+        </div>
+        <div class="check-item fi d2">
+          <svg class="check-ico" viewBox="0 0 16 16" fill="currentColor"><path d="M13.485 1.929l-8.485 8.485-3.485-3.485-1.414 1.414 4.899 4.899 9.899-9.899z"/></svg>
+          <span class="check-lbl">LLM-as-a-judge auto-evaluation</span>
+        </div>
+        <div class="check-item fi d3">
+          <svg class="check-ico" viewBox="0 0 16 16" fill="currentColor"><path d="M13.485 1.929l-8.485 8.485-3.485-3.485-1.414 1.414 4.899 4.899 9.899-9.899z"/></svg>
+          <span class="check-lbl">Full audit log for every operation</span>
+        </div>
+        <div class="check-item fi d4">
+          <svg class="check-ico" viewBox="0 0 16 16" fill="currentColor"><path d="M13.485 1.929l-8.485 8.485-3.485-3.485-1.414 1.414 4.899 4.899 9.899-9.899z"/></svg>
+          <span class="check-lbl">Prometheus metrics + Grafana dashboard</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ──────────────────────────────────────────────── INTEGRATIONS -->
+<section class="section" id="integrations">
+  <div class="container">
+    <p class="s-label fi">Integrations</p>
+    <h2 class="s-title fi d1">Works with every major framework</h2>
+    <p class="s-sub fi d2">Copy-paste examples. No boilerplate. Wire in your agent_id and go.</p>
+
+    <div class="fi d3">
+      <div class="tabs" role="tablist">
+        <button class="tab-btn active" role="tab" data-tab="langchain">LangChain</button>
+        <button class="tab-btn" role="tab" data-tab="autogen">AutoGen</button>
+        <button class="tab-btn" role="tab" data-tab="llamaindex">LlamaIndex</button>
+        <button class="tab-btn" role="tab" data-tab="vercel">Vercel AI</button>
+      </div>
+
+      <!-- LangChain -->
+      <div id="tab-langchain" class="tab-panel active">
+        <p class="int-desc">Add persistent memory to any LangChain agent in under 10 lines.</p>
+        <div class="cb">
+          <div class="cb-head">
+            <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+            <span class="cb-file">langchain_agent.py</span>
+          </div>
+          <div class="cb-body">
+            <pre><code class="language-python">from langchain.agents import AgentExecutor
+from crewlayer import CrewLayerClient
+
+cl = CrewLayerClient(api_key="crwl_...")
+AGENT_ID = "550e8400-e29b-41d4-a716-446655440000"
+
+def enrich_with_memory(query: str) -> str:
+    memories = cl.memory.recall(AGENT_ID, query=query, top_k=5)
+    context = "\n".join(f"- {m['content']}" for m in memories)
+    return f"Relevant context:\n{context}\n\nQuery: {query}"
+
+# Wrap your existing AgentExecutor
+executor = AgentExecutor.from_agent_and_tools(agent, tools)
+response = executor.invoke({"input": enrich_with_memory(user_query)})
+
+# Persist new memories after the call
+cl.memory.save(AGENT_ID, content=response["output"], importance=0.7)</code></pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- AutoGen -->
+      <div id="tab-autogen" class="tab-panel">
+        <p class="int-desc">Plug CrewLayer into AutoGen agents as a stateful memory backend.</p>
+        <div class="cb">
+          <div class="cb-head">
+            <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+            <span class="cb-file">autogen_agent.py</span>
+          </div>
+          <div class="cb-body">
+            <pre><code class="language-python">import autogen
+from crewlayer import CrewLayerClient
+
+cl = CrewLayerClient(api_key="crwl_...")
+AGENT_ID = "550e8400-e29b-41d4-a716-446655440000"
+
+class MemoryAssistant(autogen.AssistantAgent):
+    def generate_reply(self, messages, sender, **kwargs):
+        last_msg = messages[-1]["content"]
+
+        # Pull relevant memories before responding
+        memories = cl.memory.recall(AGENT_ID, query=last_msg, top_k=5)
+        if memories:
+            mem_ctx = "\n".join(f"- {m['content']}" for m in memories)
+            messages = [
+                {"role": "system", "content": f"Memory:\n{mem_ctx}"}
+            ] + messages
+
+        reply = super().generate_reply(messages, sender, **kwargs)
+
+        # Log the action
+        cl.actions.log(AGENT_ID, tool_name="generate_reply",
+                       input_params={"query": last_msg},
+                       output_result={"reply": reply}, status="success")
+        return reply</code></pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- LlamaIndex -->
+      <div id="tab-llamaindex" class="tab-panel">
+        <p class="int-desc">Use CrewLayer alongside LlamaIndex's query engine for persistent cross-session context.</p>
+        <div class="cb">
+          <div class="cb-head">
+            <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+            <span class="cb-file">llamaindex_agent.py</span>
+          </div>
+          <div class="cb-body">
+            <pre><code class="language-python">from llama_index.core import VectorStoreIndex
+from crewlayer import CrewLayerClient
+
+cl = CrewLayerClient(api_key="crwl_...")
+AGENT_ID = "550e8400-e29b-41d4-a716-446655440000"
+
+index = VectorStoreIndex.from_documents(docs)
+query_engine = index.as_query_engine()
+
+def query_with_memory(question: str) -> str:
+    # Enrich query with agent's long-term memory
+    past = cl.memory.recall(AGENT_ID, query=question, top_k=3)
+    enriched = question
+    if past:
+        enriched += "\n\n[Agent memory]\n"
+        enriched += "\n".join(m["content"] for m in past)
+
+    response = query_engine.query(enriched)
+
+    # Persist response as a new memory
+    cl.memory.save(AGENT_ID, content=str(response), importance=0.7)
+    return str(response)</code></pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- Vercel AI -->
+      <div id="tab-vercel" class="tab-panel">
+        <p class="int-desc">Add stateful memory to Vercel AI SDK routes in a few lines of TypeScript.</p>
+        <div class="cb">
+          <div class="cb-head">
+            <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+            <span class="cb-file">app/api/chat/route.ts</span>
+          </div>
+          <div class="cb-body">
+            <pre><code class="language-typescript">import { streamText } from 'ai'
+import { openai } from '@ai-sdk/openai'
+import { CrewLayerClient } from '@crewlayer/sdk'
+
+const cl = new CrewLayerClient({ apiKey: process.env.CREWLAYER_API_KEY! })
+const AGENT_ID = '550e8400-e29b-41d4-a716-446655440000'
+
+export async function POST(req: Request) {
+  const { messages } = await req.json()
+  const lastMsg = messages.at(-1)?.content ?? ''
+
+  // Pull relevant memories for context
+  const memories = await cl.memory.recall(AGENT_ID, {
+    query: lastMsg, topK: 5
+  })
+  const memCtx = memories.map(m => `- ${m.content}`).join('\n')
+
+  const result = streamText({
+    model: openai('gpt-4o'),
+    system: `You are a helpful assistant.\n\nMemory:\n${memCtx}`,
+    messages,
+    onFinish: async ({ text }) => {
+      // Persist assistant reply as a new memory
+      await cl.memory.save(AGENT_ID, { content: text, importance: 0.6 })
+    }
+  })
+
+  return result.toDataStreamResponse()
+}</code></pre>
+          </div>
+        </div>
+      </div>
+    </div><!-- /tab container -->
+  </div>
+</section>
+
+<!-- ──────────────────────────────────────────────────── DASHBOARD -->
+<section class="section" id="dashboard">
+  <div class="container">
+    <div class="dash-inner">
+      <div>
+        <p class="s-label fi">Dashboard</p>
+        <h2 class="s-title fi d1">Full visibility into every agent</h2>
+        <p class="s-sub fi d2">
+          Web dashboard included. See memories, actions, evaluations, and agent status in real time.
+          No extra setup required.
+        </p>
+
+        <div class="dash-feat-list fi d3">
+          <div class="dash-feat">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M13.485 1.929l-8.485 8.485-3.485-3.485-1.414 1.414 4.899 4.899 9.899-9.899z"/></svg>
+            Memory explorer with semantic search
+          </div>
+          <div class="dash-feat">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M13.485 1.929l-8.485 8.485-3.485-3.485-1.414 1.414 4.899 4.899 9.899-9.899z"/></svg>
+            Action replay and full audit history
+          </div>
+          <div class="dash-feat">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M13.485 1.929l-8.485 8.485-3.485-3.485-1.414 1.414 4.899 4.899 9.899-9.899z"/></svg>
+            A/B test results and prompt version history
+          </div>
+          <div class="dash-feat">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M13.485 1.929l-8.485 8.485-3.485-3.485-1.414 1.414 4.899 4.899 9.899-9.899z"/></svg>
+            Anomaly alerts and LLM evaluation scores
+          </div>
+          <div class="dash-feat">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M13.485 1.929l-8.485 8.485-3.485-3.485-1.414 1.414 4.899 4.899 9.899-9.899z"/></svg>
+            Agent status history with 3-second polling
+          </div>
+        </div>
+      </div>
+
+      <!-- Mockup -->
+      <div class="dash-mockup fi d2">
+        <div class="mockup-head">
+          <div class="dot dot-r"></div>
+          <div class="dot dot-y"></div>
+          <div class="dot dot-g"></div>
+          <span style="margin-left:8px;font-size:11px;color:var(--muted);">CrewLayer — Agents</span>
+        </div>
+        <!-- Table header row -->
+        <div style="display:flex;gap:12px;padding:9px 16px;border-bottom:1px solid var(--border);background:#0d0d0d;">
+          <span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);flex:1;">Agent</span>
+          <span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);width:60px;text-align:center;">Status</span>
+          <span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);width:56px;text-align:right;">Updated</span>
+        </div>
+        <div class="mockup-row">
+          <div class="agent-avatar">🤖</div>
+          <div class="agent-info">
+            <div class="agent-name">sales-agent-v2</div>
+            <div class="agent-id">550e8400-e29b-41d4-a7…</div>
+          </div>
+          <span class="status-badge status-working">working</span>
+          <span class="ts">2s ago</span>
+        </div>
+        <div class="mockup-row">
+          <div class="agent-avatar">🤖</div>
+          <div class="agent-info">
+            <div class="agent-name">support-agent</div>
+            <div class="agent-id">f47ac10b-58cc-4372-a5…</div>
+          </div>
+          <span class="status-badge status-idle">idle</span>
+          <span class="ts">4m ago</span>
+        </div>
+        <div class="mockup-row">
+          <div class="agent-avatar">🤖</div>
+          <div class="agent-info">
+            <div class="agent-name">data-pipeline</div>
+            <div class="agent-id">6ba7b810-9dad-11d1-80…</div>
+          </div>
+          <span class="status-badge status-error">error</span>
+          <span class="ts">11m ago</span>
+        </div>
+        <div class="mockup-row">
+          <div class="agent-avatar">🤖</div>
+          <div class="agent-info">
+            <div class="agent-name">research-agent</div>
+            <div class="agent-id">6ba7b812-9dad-11d1-80…</div>
+          </div>
+          <span class="status-badge status-working">working</span>
+          <span class="ts">just now</span>
+        </div>
+        <div class="mockup-foot">
+          <span style="font-size:11px;color:var(--muted);">4 agents · 2 working</span>
+          <span style="font-size:11px;color:var(--accent);">View all →</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────── SELF-HOST -->
+<section class="section" id="selfhost">
+  <div class="container">
+    <div class="sh-inner">
+      <div>
+        <p class="s-label fi">Self-host</p>
+        <h2 class="s-title fi d1">Yours to run, yours to own</h2>
+        <p class="s-sub fi d2">
+          No SaaS pricing. No data leaving your infrastructure. Deploy on any machine that runs Docker —
+          your VPS, AWS, bare metal, or local dev machine. CrewLayer is MIT-licensed and always will be.
+        </p>
+
+        <div class="pills-row fi d3">
+          <span class="pill">No vendor lock-in</span>
+          <span class="pill">Your data stays yours</span>
+          <span class="pill">MIT License</span>
+        </div>
+      </div>
+
+      <div class="fi d2">
+        <div class="cb">
+          <div class="cb-head">
+            <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+            <span class="cb-file">terminal</span>
+          </div>
+          <div class="cb-body">
+            <pre><code class="language-bash"># 1. Clone and configure
+git clone https://github.com/GerardSole/CrewLayer
+cd CrewLayer
+cp .env.example .env
+# Edit .env — add your ANTHROPIC_API_KEY
+
+# 2. Start everything with one command
+docker compose up -d
+
+# Starts: PostgreSQL · Redis · API · Dashboard
+# API        → http://localhost:8000
+# Dashboard  → http://localhost:8000/dashboard
+
+# 3. Optional: observability stack
+docker compose -f docker-compose.observability.yml up -d
+# Prometheus → :9090   Grafana → :3000</code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ──────────────────────────────────────────────────── COMPARE -->
+<section class="section" id="compare">
+  <div class="container">
+    <p class="s-label fi">Comparison</p>
+    <h2 class="s-title fi d1">How CrewLayer compares</h2>
+    <p class="s-sub fi d2">The only solution that gives you everything in one self-hosted package.</p>
+
+    <div class="cmp-wrap fi d3">
+      <table class="cmp-table">
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th class="hl">CrewLayer</th>
+            <th>Mem0</th>
+            <th>Zep</th>
+            <th>Build it yourself</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Persistent memory</td>
+            <td class="hl"><span class="cy">✓</span></td>
+            <td><span class="cy">✓</span></td>
+            <td><span class="cy">✓</span></td>
+            <td><span class="cp">weeks</span></td>
+          </tr>
+          <tr>
+            <td>Semantic recall</td>
+            <td class="hl"><span class="cy">✓</span></td>
+            <td><span class="cy">✓</span></td>
+            <td><span class="cy">✓</span></td>
+            <td><span class="cp">weeks</span></td>
+          </tr>
+          <tr>
+            <td>Action logging</td>
+            <td class="hl"><span class="cy">✓</span></td>
+            <td><span class="cn">✗</span></td>
+            <td><span class="cn">✗</span></td>
+            <td><span class="cp">weeks</span></td>
+          </tr>
+          <tr>
+            <td>Multi-agent context</td>
+            <td class="hl"><span class="cy">✓</span></td>
+            <td><span class="cn">✗</span></td>
+            <td><span class="cp">partial</span></td>
+            <td><span class="cp">weeks</span></td>
+          </tr>
+          <tr>
+            <td>Evaluations &amp; A/B testing</td>
+            <td class="hl"><span class="cy">✓</span></td>
+            <td><span class="cn">✗</span></td>
+            <td><span class="cn">✗</span></td>
+            <td><span class="cn">✗</span></td>
+          </tr>
+          <tr>
+            <td>Self-hosteable</td>
+            <td class="hl"><span class="cy">✓</span></td>
+            <td><span class="cp">paid plan</span></td>
+            <td><span class="cy">✓</span></td>
+            <td><span class="cy">✓</span></td>
+          </tr>
+          <tr>
+            <td>Open source</td>
+            <td class="hl"><span class="cy">✓</span></td>
+            <td><span class="cy">✓</span></td>
+            <td><span class="cy">✓</span></td>
+            <td><span class="cy">✓</span></td>
+          </tr>
+          <tr>
+            <td>MCP server</td>
+            <td class="hl"><span class="cy">✓</span></td>
+            <td><span class="cn">✗</span></td>
+            <td><span class="cn">✗</span></td>
+            <td><span class="cn">✗</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────── CTA FINAL -->
+<section id="cta">
+  <div class="container">
+    <h2 class="fi">Give your agents a memory</h2>
+    <p class="cta-sub fi d1">Open source. Self-hosteable. Production ready.</p>
+
+    <div class="btn-row fi d2">
+      <a href="#" class="btn-white">Get Started →</a>
+      <a href="https://github.com/GerardSole/CrewLayer" class="btn-outline">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+        </svg>
+        View on GitHub
+      </a>
+    </div>
+
+    <a href="#" class="cta-note fi d3">Read the documentation →</a>
+  </div>
+</section>
+
+<!-- ──────────────────────────────────────────────────── FOOTER -->
+<footer>
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <a href="#" class="nav-logo" style="display:inline-flex;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <rect x="3" y="15" width="18" height="4" rx="2" fill="#22c55e" opacity="0.95"/>
+            <rect x="3" y="10" width="18" height="4" rx="2" fill="#22c55e" opacity="0.6"/>
+            <rect x="3" y="5"  width="18" height="4" rx="2" fill="#22c55e" opacity="0.28"/>
+          </svg>
+          CrewLayer
+        </a>
+        <p class="footer-tagline">
+          The memory layer for AI agents.<br>
+          Open source, self-hosteable, MIT License.
+        </p>
+      </div>
+
+      <div>
+        <p class="footer-col-title">Product</p>
+        <ul class="footer-links">
+          <li><a href="/docs">Docs</a></li>
+          <li><a href="https://github.com/GerardSole/CrewLayer">GitHub</a></li>
+          <li><a href="/dashboard">Dashboard</a></li>
+          <li><a href="#">Changelog</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <p class="footer-col-title">Community</p>
+        <ul class="footer-links">
+          <li><a href="#">Discord</a></li>
+          <li><a href="https://github.com/GerardSole/CrewLayer/blob/main/CONTRIBUTING.md">Contributing</a></li>
+          <li><a href="https://github.com/GerardSole/CrewLayer/issues">Issues</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <p class="footer-col-title">Legal</p>
+        <ul class="footer-links">
+          <li><a href="https://github.com/GerardSole/CrewLayer/blob/main/LICENSE">MIT License</a></li>
+          <li><a href="#">Privacy</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <span>© 2025 CrewLayer. MIT License.</span>
+      <span>Built for the agent community</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // ── highlight.js ────────────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', () => {
+    hljs.highlightAll();
+  });
+
+  // ── Scroll animations ────────────────────────────────────────
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('v');
+        observer.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.1, rootMargin: '0px 0px -36px 0px' });
+
+  document.querySelectorAll('.fi').forEach(el => observer.observe(el));
+
+  // ── Tab switcher ─────────────────────────────────────────────
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tabId = btn.dataset.tab;
+
+      btn.closest('.fi').querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.closest('.fi').querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+
+      btn.classList.add('active');
+      const panel = document.getElementById('tab-' + tabId);
+      if (panel) {
+        panel.classList.add('active');
+        panel.querySelectorAll('pre code:not(.hljs)').forEach(el => hljs.highlightElement(el));
+      }
+    });
+  });
+
+  // ── Mobile nav ───────────────────────────────────────────────
+  const navToggle = document.getElementById('navToggle');
+  const nav = document.getElementById('nav');
+  if (navToggle && nav) {
+    navToggle.addEventListener('click', () => nav.classList.toggle('open'));
+    document.addEventListener('click', e => {
+      if (!nav.contains(e.target)) nav.classList.remove('open');
+    });
+  }
+</script>
+</body>
+</html>

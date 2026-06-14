@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Core Concepts — CrewLayer Docs</title>
+  <meta name="description" content="Understand agents, memory, actions, sessions, episodes, and the blackboard." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
+  <link rel="stylesheet" href="docs.css" />
+</head>
+<body>
+<div class="overlay" id="overlay"></div>
+<header class="topbar">
+  <div class="topbar-left">
+    <button class="sidebar-btn" id="sidebarBtn" aria-label="Toggle sidebar">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    </button>
+    <a href="../landing/index.html" class="topbar-logo">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="15" width="18" height="4" rx="2" fill="#22c55e" opacity=".95"/><rect x="3" y="10" width="18" height="4" rx="2" fill="#22c55e" opacity=".6"/><rect x="3" y="5" width="18" height="4" rx="2" fill="#22c55e" opacity=".28"/></svg>CrewLayer
+    </a>
+    <span class="topbar-sep">/</span>
+    <span class="topbar-section">Core Concepts</span>
+  </div>
+  <div class="topbar-right">
+    <div class="search-wrap">
+      <svg class="search-icon" width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.5"/><path d="M11 11l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <input type="search" id="docsSearch" class="search-input" placeholder="Search docs…" autocomplete="off" />
+      <div id="searchDrop" class="search-drop hidden"></div>
+    </div>
+    <a href="https://github.com/GerardSole/CrewLayer" class="topbar-gh">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>GitHub
+    </a>
+  </div>
+</header>
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-header"><span class="sidebar-version">v1.0 · MIT License</span></div>
+  <nav class="sidebar-nav">
+    <div class="nav-group"><span class="nav-group-label">Getting Started</span><a href="index.html" class="nav-link">Introduction</a><a href="quickstart.html" class="nav-link">Quick Start</a></div>
+    <div class="nav-group"><span class="nav-group-label">Concepts</span><a href="concepts.html" class="nav-link">Core Concepts</a></div>
+    <div class="nav-group"><span class="nav-group-label">Reference</span><a href="api-reference.html" class="nav-link">API Reference</a><a href="sdk-python.html" class="nav-link">Python SDK</a><a href="sdk-typescript.html" class="nav-link">TypeScript SDK</a><a href="mcp.html" class="nav-link">MCP Server</a></div>
+    <div class="nav-group"><span class="nav-group-label">Deployment</span><a href="self-hosting.html" class="nav-link">Self-Hosting</a></div>
+    <div class="nav-group"><span class="nav-group-label">Guides</span><a href="integrations.html" class="nav-link">Integrations</a></div>
+  </nav>
+</aside>
+
+<main class="content">
+<article class="content-body">
+
+<h1>Core Concepts</h1>
+<div class="page-meta"><span>Concepts</span><span>·</span><span>8 min read</span></div>
+
+<p>CrewLayer organizes data around a handful of primitive concepts. Understanding how they relate to each other makes the API intuitive.</p>
+
+<h2 id="tenant">Tenant</h2>
+<p>A <strong>Tenant</strong> is the top-level isolation unit. Everything in CrewLayer — agents, memories, actions, API keys — belongs to a tenant. In a SaaS product, each customer is a separate tenant. In a personal project, you typically have a single tenant.</p>
+<p>Tenants have a <code>settings</code> JSON field for configuration like memory decay thresholds. All resources are physically isolated by tenant ID in the database; queries never cross tenant boundaries.</p>
+
+<h2 id="agent">Agent</h2>
+<p>An <strong>Agent</strong> is the entity whose memory, actions, and context you're tracking. It maps 1:1 to a logical AI agent in your system. An agent has:</p>
+<ul>
+  <li><strong>id</strong> — UUID, used in every API call</li>
+  <li><strong>name</strong> — human-readable label</li>
+  <li><strong>status</strong> — <code>idle</code> | <code>working</code> | <code>error</code> (cached in Redis, 60s TTL)</li>
+  <li><strong>tags</strong> — arbitrary string array for filtering</li>
+  <li><strong>config</strong> — arbitrary JSON for agent-specific settings</li>
+  <li><strong>current_session_id</strong> — which session is active right now</li>
+</ul>
+
+<p>Agents can have <strong>relations</strong> to each other: <code>supervisor</code>, <code>collaborator</code>, or <code>delegate</code>. Relations enable propagating blackboard writes across the hierarchy.</p>
+
+<h2 id="memory">Memory</h2>
+<p>CrewLayer has two distinct memory stores:</p>
+
+<h3 id="short-term-memory">Short-term memory</h3>
+<p>Short-term memory is a list of <strong>messages</strong> (role + content) stored in Redis under a session key. It functions like the conversation history you'd pass to an LLM. Messages are fast to read/write and are scoped to a session. They expire when the session closes or the TTL elapses.</p>
+
+<p><em>Use it for:</em> the current conversation window. Append every user/assistant turn; feed it as context to the next LLM call.</p>
+
+<h3 id="long-term-memory">Long-term memory</h3>
+<p>Long-term memory is a vector table in PostgreSQL (pgvector). Each memory record has:</p>
+<ul>
+  <li><strong>content</strong> — plain text</li>
+  <li><strong>embedding</strong> — 1536-dim float32 vector (Anthropic or local model)</li>
+  <li><strong>importance</strong> — float 0–1, used in decay scoring</li>
+  <li><strong>source</strong> — <code>manual</code> | <code>extracted</code> | <code>episode</code></li>
+  <li><strong>access_count</strong> — bumped on every recall; used for decay</li>
+</ul>
+
+<p><strong>Recall</strong> uses cosine similarity: given a query, CrewLayer embeds it and returns the top-k most similar memories. Use this at the start of every LLM call to inject relevant context.</p>
+
+<p><strong>Extraction</strong> happens when you close a session (<code>POST /v1/sessions/{id}/close</code>). Claude reads the entire conversation and extracts new facts to persist as long-term memories. This is how the agent learns from conversations automatically.</p>
+
+<p><strong>Decay</strong> runs nightly at 03:00 UTC. Memories with low importance and low access count are archived or deleted, keeping the vector store lean over time.</p>
+
+<h2 id="action">Action</h2>
+<p>An <strong>Action</strong> is an immutable log entry representing a tool call the agent made. Every action stores:</p>
+<ul>
+  <li><code>tool_name</code> — what was called</li>
+  <li><code>input_params</code> — full input JSON</li>
+  <li><code>output_result</code> — full output JSON</li>
+  <li><code>status</code> — <code>success</code> | <code>error</code> | <code>timeout</code></li>
+  <li><code>duration_ms</code> — wall-clock time</li>
+  <li><code>session_id</code> — optional, links to the session it happened in</li>
+</ul>
+
+<p><em>Use it for:</em> debugging, auditing, replay, and anomaly detection. Actions are the source of truth for "what did the agent actually do?"</p>
+
+<h2 id="session">Session</h2>
+<p>A <strong>Session</strong> is a bounded conversation window. Think of it as a single user conversation or a single task run. A session:</p>
+<ul>
+  <li>Has a start time and optional end time</li>
+  <li>Holds short-term memory (messages) in Redis</li>
+  <li>Links to zero or more actions that happened during it</li>
+  <li>Belongs to one agent</li>
+  <li>Can be closed to trigger memory extraction</li>
+</ul>
+
+<p>Create a new session when a new conversation starts. Close it when the conversation ends to extract long-term memories from what was discussed.</p>
+
+<h2 id="episode">Episode</h2>
+<p>An <strong>Episode</strong> is a higher-level grouping of sessions around a coherent task or goal. For example, "implement feature X" might span multiple chat sessions over several days — those all belong to the same episode.</p>
+
+<p>Episodes have their own recall endpoint: you can search memories that are tagged to a specific episode, giving the agent focused context for the current task without noise from other work.</p>
+
+<h2 id="blackboard">Blackboard (Shared Context)</h2>
+<p>The <strong>Blackboard</strong> is a multi-agent coordination store. It's a namespaced key-value store where any agent in the same tenant can read and write values. Every write is versioned, so you can see history and roll back.</p>
+
+<p>The blackboard supports real-time pub/sub via SSE: agents can subscribe to a namespace and receive notifications when any key in it changes. This enables reactive multi-agent pipelines without polling.</p>
+
+<div class="cb">
+  <div class="cb-head"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="cb-file">example — multi-agent pipeline</span></div>
+  <div class="cb-body"><pre><code class="language-python"># Agent A writes a result to the shared blackboard
+client.context.write(namespace="pipeline", key="step1_result", value={"items": [...]})
+
+# Agent B reads it (or receives it via SSE subscription)
+result = client.context.read(namespace="pipeline", key="step1_result")
+print(result["value"])  # {"items": [...]}</code></pre></div>
+</div>
+
+<h2 id="api-key">API Key</h2>
+<p>API keys authenticate requests. They are prefixed with <code>crwl_</code>, hashed with bcrypt, and stored in the database. Each key has:</p>
+<ul>
+  <li><strong>scopes</strong> — fine-grained permissions like <code>memory:read</code>, <code>agents:write</code>, or <code>*</code> for all</li>
+  <li><strong>rate limit</strong> — optional per-key rate limiting (requests/minute)</li>
+  <li><strong>expires_at</strong> — optional expiry</li>
+</ul>
+
+<p>Pass the key in every request as the <code>X-API-Key</code> header.</p>
+
+<h2 id="relationship-diagram">How it all fits together</h2>
+<div class="cb">
+  <div class="cb-head"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="cb-file">data model</span></div>
+  <div class="cb-body"><pre><code class="language-bash">Tenant
+└── Agent (many)
+    ├── Session (many)
+    │   ├── Short-term memory (Redis messages)
+    │   └── Actions (many)
+    ├── Long-term memories (pgvector)
+    ├── Episodes (many)
+    │   └── Sessions (many)
+    └── Relations → other Agents
+
+Tenant
+└── Blackboard (shared across all agents)
+    └── Namespace → Key → Value (versioned)</code></pre></div>
+</div>
+
+<div class="page-nav">
+  <a href="quickstart.html" class="page-nav-link prev">
+    <span class="page-nav-dir">← Previous</span>
+    <span class="page-nav-title">Quick Start</span>
+  </a>
+  <a href="api-reference.html" class="page-nav-link next">
+    <span class="page-nav-dir">Next →</span>
+    <span class="page-nav-title">API Reference</span>
+  </a>
+</div>
+
+</article>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/bash.min.js"></script>
+<script src="docs.js"></script>
+</body>
+</html>

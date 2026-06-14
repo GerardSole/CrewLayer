@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Self-Hosting — CrewLayer Docs</title>
+  <meta name="description" content="Deploy CrewLayer on your own infrastructure." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
+  <link rel="stylesheet" href="docs.css" />
+</head>
+<body>
+<div class="overlay" id="overlay"></div>
+<header class="topbar">
+  <div class="topbar-left">
+    <button class="sidebar-btn" id="sidebarBtn" aria-label="Toggle sidebar">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    </button>
+    <a href="../landing/index.html" class="topbar-logo">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="15" width="18" height="4" rx="2" fill="#22c55e" opacity=".95"/><rect x="3" y="10" width="18" height="4" rx="2" fill="#22c55e" opacity=".6"/><rect x="3" y="5" width="18" height="4" rx="2" fill="#22c55e" opacity=".28"/></svg>CrewLayer
+    </a>
+    <span class="topbar-sep">/</span>
+    <span class="topbar-section">Self-Hosting</span>
+  </div>
+  <div class="topbar-right">
+    <div class="search-wrap">
+      <svg class="search-icon" width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.5"/><path d="M11 11l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <input type="search" id="docsSearch" class="search-input" placeholder="Search docs…" autocomplete="off" />
+      <div id="searchDrop" class="search-drop hidden"></div>
+    </div>
+    <a href="https://github.com/GerardSole/CrewLayer" class="topbar-gh">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>GitHub
+    </a>
+  </div>
+</header>
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-header"><span class="sidebar-version">v1.0 · MIT License</span></div>
+  <nav class="sidebar-nav">
+    <div class="nav-group"><span class="nav-group-label">Getting Started</span><a href="index.html" class="nav-link">Introduction</a><a href="quickstart.html" class="nav-link">Quick Start</a></div>
+    <div class="nav-group"><span class="nav-group-label">Concepts</span><a href="concepts.html" class="nav-link">Core Concepts</a></div>
+    <div class="nav-group"><span class="nav-group-label">Reference</span><a href="api-reference.html" class="nav-link">API Reference</a><a href="sdk-python.html" class="nav-link">Python SDK</a><a href="sdk-typescript.html" class="nav-link">TypeScript SDK</a><a href="mcp.html" class="nav-link">MCP Server</a></div>
+    <div class="nav-group"><span class="nav-group-label">Deployment</span><a href="self-hosting.html" class="nav-link">Self-Hosting</a></div>
+    <div class="nav-group"><span class="nav-group-label">Guides</span><a href="integrations.html" class="nav-link">Integrations</a></div>
+  </nav>
+</aside>
+
+<main class="content">
+<article class="content-body">
+
+<h1>Self-Hosting</h1>
+<div class="page-meta"><span>Deployment</span><span>·</span><span>Docker · Production</span></div>
+
+<p>CrewLayer is designed to self-host on any machine that runs Docker. This page covers local setup, environment configuration, and a production-ready setup with nginx and SSL.</p>
+
+<h2 id="quick-setup">Quick Setup (Local / Dev)</h2>
+
+<div class="cb">
+  <div class="cb-head"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="cb-file">terminal</span></div>
+  <div class="cb-body"><pre><code class="language-bash">git clone https://github.com/GerardSole/CrewLayer
+cd CrewLayer
+cp .env.example .env    # then edit .env
+docker compose up -d
+
+# Verify
+curl http://localhost:8000/health
+# → {"status": "ok", "db": "ok", "redis": "ok"}</code></pre></div>
+</div>
+
+<p>Services started by <code>docker compose up -d</code>:</p>
+<ul>
+  <li><strong>postgres</strong> — PostgreSQL 16 with pgvector extension</li>
+  <li><strong>redis</strong> — Redis 7</li>
+  <li><strong>api</strong> — FastAPI application (uvicorn)</li>
+</ul>
+
+<p>The API runs database migrations via Alembic automatically on startup.</p>
+
+<h2 id="env-vars">Environment Variables</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Variable</th><th>Required</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><span class="mono">ANTHROPIC_API_KEY</span></td>
+      <td><span class="req">required</span></td>
+      <td>Anthropic API key. Used for memory extraction (claude-opus-4-8) and embeddings.</td>
+    </tr>
+    <tr>
+      <td><span class="mono">DATABASE_URL</span></td>
+      <td><span class="req">required</span></td>
+      <td>PostgreSQL async URL. Format: <code>postgresql+asyncpg://user:pass@host/db</code>. In Docker Compose this is pre-configured.</td>
+    </tr>
+    <tr>
+      <td><span class="mono">REDIS_URL</span></td>
+      <td><span class="req">required</span></td>
+      <td>Redis connection URL. Default: <code>redis://localhost:6379</code>.</td>
+    </tr>
+    <tr>
+      <td><span class="mono">SECRET_KEY</span></td>
+      <td><span class="req">required</span></td>
+      <td>Random secret for signing JWTs (dashboard auth). Generate with: <code>python -c "import secrets; print(secrets.token_hex(32))"</code></td>
+    </tr>
+    <tr>
+      <td><span class="mono">EMBEDDING_PROVIDER</span></td>
+      <td><span class="opt">optional</span></td>
+      <td><code>anthropic</code> (default) or <code>local</code>. Use <code>local</code> to run sentence-transformers locally without API cost.</td>
+    </tr>
+    <tr>
+      <td><span class="mono">METRICS_TOKEN</span></td>
+      <td><span class="opt">optional</span></td>
+      <td>Bearer token required to access <code>/metrics</code> from non-localhost IPs. Leave unset to block external access.</td>
+    </tr>
+    <tr>
+      <td><span class="mono">MCP_PORT</span></td>
+      <td><span class="opt">optional</span></td>
+      <td>Port for the MCP server in SSE mode. Default: <code>8001</code>.</td>
+    </tr>
+    <tr>
+      <td><span class="mono">MCP_TRANSPORT</span></td>
+      <td><span class="opt">optional</span></td>
+      <td><code>stdio</code> (default, for Claude Desktop/Code) or <code>sse</code> (for Docker/HTTP).</td>
+    </tr>
+    <tr>
+      <td><span class="mono">CREWLAYER_API_KEY</span></td>
+      <td><span class="opt">optional</span></td>
+      <td>API key the MCP server uses when calling the backend. Required only when running the MCP server.</td>
+    </tr>
+    <tr>
+      <td><span class="mono">MEMORY_DECAY_ENABLED</span></td>
+      <td><span class="opt">optional</span></td>
+      <td><code>true</code> (default) or <code>false</code>. Controls whether the nightly memory decay job runs.</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="observability">Observability Stack</h2>
+<p>CrewLayer ships a separate Docker Compose file for Prometheus and Grafana with a prebuilt dashboard:</p>
+<div class="cb">
+  <div class="cb-head"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="cb-file">terminal</span></div>
+  <div class="cb-body"><pre><code class="language-bash">docker compose -f docker-compose.observability.yml up -d
+
+# Prometheus → http://localhost:9090
+# Grafana    → http://localhost:3000 (admin/admin by default)</code></pre></div>
+</div>
+<p>The Grafana dashboard at <code>observability/grafana/dashboards/crewlayer.json</code> shows active agents, memory counts, action rates, error rates, and Redis usage.</p>
+
+<h2 id="production">Production Setup</h2>
+
+<h3 id="nginx">nginx + SSL</h3>
+<p>Place nginx in front of the API to handle SSL termination and serve the dashboard at a clean URL:</p>
+<div class="cb">
+  <div class="cb-head"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="cb-file">/etc/nginx/sites-available/crewlayer</span></div>
+  <div class="cb-body"><pre><code class="language-bash">server {
+    listen 443 ssl http2;
+    server_name api.yourdomain.com;
+
+    ssl_certificate     /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
+
+    # Increase buffer for SSE (context subscribe, streaming)
+    proxy_buffering off;
+    proxy_read_timeout 3600s;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+# Redirect HTTP → HTTPS
+server {
+    listen 80;
+    server_name api.yourdomain.com;
+    return 301 https://$host$request_uri;
+}</code></pre></div>
+</div>
+
+<div class="callout callout-warning">
+  <span class="callout-icon">⚠️</span>
+  <p>Set <code>proxy_buffering off</code> — it's required for SSE endpoints (<code>/v1/context/.../subscribe</code>, <code>/v1/streaming</code>) to work correctly through nginx.</p>
+</div>
+
+<h3 id="backups">PostgreSQL Backups</h3>
+<div class="cb">
+  <div class="cb-head"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="cb-file">terminal</span></div>
+  <div class="cb-body"><pre><code class="language-bash"># Manual dump
+docker compose exec postgres pg_dump -U crewlayer crewlayer > backup_$(date +%Y%m%d).sql
+
+# Restore
+cat backup_20250614.sql | docker compose exec -T postgres psql -U crewlayer crewlayer
+
+# Automated daily backup with cron (add to crontab -e)
+0 2 * * * cd /path/to/CrewLayer && docker compose exec postgres pg_dump -U crewlayer crewlayer | gzip > /backups/crewlayer_$(date +\%Y\%m\%d).sql.gz</code></pre></div>
+</div>
+
+<h3 id="resources">Recommended Resources</h3>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Tier</th><th>CPU</th><th>RAM</th><th>Disk</th><th>Use case</th></tr></thead>
+  <tbody>
+    <tr><td>Dev</td><td>2 vCPU</td><td>4 GB</td><td>20 GB</td><td>Local dev, testing</td></tr>
+    <tr><td>Small</td><td>2 vCPU</td><td>8 GB</td><td>50 GB</td><td>1–5 agents, low traffic</td></tr>
+    <tr><td>Medium</td><td>4 vCPU</td><td>16 GB</td><td>100 GB SSD</td><td>10–50 agents, moderate load</td></tr>
+    <tr><td>Large</td><td>8 vCPU</td><td>32 GB</td><td>500 GB SSD</td><td>100+ agents, high traffic</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="upgrading">Upgrading to a New Version</h2>
+<div class="cb">
+  <div class="cb-head"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="cb-file">terminal</span></div>
+  <div class="cb-body"><pre><code class="language-bash"># 1. Pull latest changes
+git pull origin main
+
+# 2. Rebuild the API image
+docker compose build api
+
+# 3. Run migrations (Alembic runs on startup automatically, but you can run manually)
+docker compose run --rm api alembic upgrade head
+
+# 4. Restart
+docker compose up -d
+
+# 5. Verify
+curl http://localhost:8000/health</code></pre></div>
+</div>
+
+<div class="callout callout-tip">
+  <span class="callout-icon">💡</span>
+  <p>Always take a PostgreSQL backup before upgrading, especially when there are new Alembic migrations.</p>
+</div>
+
+<h2 id="migrations">Running Migrations Manually</h2>
+<div class="cb">
+  <div class="cb-head"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="cb-file">terminal</span></div>
+  <div class="cb-body"><pre><code class="language-bash"># Apply all pending migrations
+docker compose run --rm api alembic upgrade head
+
+# Check current migration version
+docker compose run --rm api alembic current
+
+# Rollback one migration
+docker compose run --rm api alembic downgrade -1
+
+# Create a new migration after changing db/models.py
+docker compose run --rm api alembic revision --autogenerate -m "add new table"</code></pre></div>
+</div>
+
+<div class="page-nav">
+  <a href="mcp.html" class="page-nav-link prev">
+    <span class="page-nav-dir">← Previous</span>
+    <span class="page-nav-title">MCP Server</span>
+  </a>
+  <a href="integrations.html" class="page-nav-link next">
+    <span class="page-nav-dir">Next →</span>
+    <span class="page-nav-title">Integrations</span>
+  </a>
+</div>
+
+</article>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/bash.min.js"></script>
+<script src="docs.js"></script>
+</body>
+</html>
