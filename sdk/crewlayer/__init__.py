@@ -15,6 +15,8 @@ from crewlayer._types import (
     ActionRecord,
     ActionStats,
     AnomalyRecord,
+    AutoEvaluateResult,
+    BatchAutoEvaluateResult,
     ContextEntry,
     ContextNamespace,
     DayTrend,
@@ -73,6 +75,8 @@ __all__ = [
     "ABTestRecord",
     "ABTestResults",
     "VariantResults",
+    "AutoEvaluateResult",
+    "BatchAutoEvaluateResult",
 ]
 
 __version__ = "0.1.0"

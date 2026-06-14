@@ -6,6 +6,8 @@ from crewlayer._types import (
     ABTestRecord,
     ABTestResults,
     AnomalyRecord,
+    AutoEvaluateResult,
+    BatchAutoEvaluateResult,
     EvaluationRecord,
     EvaluationSummary,
 )
@@ -65,6 +67,37 @@ class EvaluationsClient:
             params["prompt_version_id"] = prompt_version_id
         data = self._http.request("GET", f"/v1/agents/{agent_id}/evaluations", params=params)
         return [EvaluationRecord._from(e) for e in data["items"]]
+
+    def auto_evaluate(
+        self,
+        agent_id: str,
+        action_id: str,
+        *,
+        criteria: list[str] | None = None,
+    ) -> AutoEvaluateResult:
+        """Auto-evaluate an action using Claude as judge (LLM-as-a-judge)."""
+        data = self._http.request(
+            "POST",
+            f"/v1/agents/{agent_id}/actions/{action_id}/auto-evaluate",
+            json={"criteria": criteria},
+        )
+        return AutoEvaluateResult._from(data)
+
+    def auto_evaluate_batch(
+        self,
+        agent_id: str,
+        *,
+        limit: int = 20,
+        since: str | None = None,
+        criteria: list[str] | None = None,
+    ) -> BatchAutoEvaluateResult:
+        """Kick off background batch auto-evaluation for actions without an auto-evaluation."""
+        data = self._http.request(
+            "POST",
+            f"/v1/agents/{agent_id}/actions/auto-evaluate-batch",
+            json={"limit": limit, "since": since, "criteria": criteria},
+        )
+        return BatchAutoEvaluateResult._from(data)
 
     def list_anomalies(
         self, agent_id: str, *, resolved: bool | None = None
@@ -181,6 +214,37 @@ class AsyncEvaluationsClient:
             params["prompt_version_id"] = prompt_version_id
         data = await self._http.request("GET", f"/v1/agents/{agent_id}/evaluations", params=params)
         return [EvaluationRecord._from(e) for e in data["items"]]
+
+    async def auto_evaluate(
+        self,
+        agent_id: str,
+        action_id: str,
+        *,
+        criteria: list[str] | None = None,
+    ) -> AutoEvaluateResult:
+        """Auto-evaluate an action using Claude as judge (LLM-as-a-judge)."""
+        data = await self._http.request(
+            "POST",
+            f"/v1/agents/{agent_id}/actions/{action_id}/auto-evaluate",
+            json={"criteria": criteria},
+        )
+        return AutoEvaluateResult._from(data)
+
+    async def auto_evaluate_batch(
+        self,
+        agent_id: str,
+        *,
+        limit: int = 20,
+        since: str | None = None,
+        criteria: list[str] | None = None,
+    ) -> BatchAutoEvaluateResult:
+        """Kick off background batch auto-evaluation for actions without an auto-evaluation."""
+        data = await self._http.request(
+            "POST",
+            f"/v1/agents/{agent_id}/actions/auto-evaluate-batch",
+            json={"limit": limit, "since": since, "criteria": criteria},
+        )
+        return BatchAutoEvaluateResult._from(data)
 
     async def list_anomalies(
         self, agent_id: str, *, resolved: bool | None = None

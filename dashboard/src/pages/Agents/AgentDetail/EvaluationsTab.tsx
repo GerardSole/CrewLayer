@@ -11,6 +11,8 @@ import {
   Plus,
   CheckCircle2,
   X,
+  Bot,
+  Zap,
 } from 'lucide-react'
 import {
   LineChart,
@@ -36,6 +38,7 @@ import {
   getABTestResults,
   createABTest,
   completeABTest,
+  autoEvaluateBatch,
 } from '@/api/evaluations'
 import { listPromptVersions } from '@/api/prompts'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -429,6 +432,15 @@ export function EvaluationsTab({ agentId }: { agentId: string }) {
   const since14 = useMemo(() => subDays(new Date(), 14).toISOString().split('T')[0], [])
   const since7  = useMemo(() => subDays(new Date(), 7).toISOString().split('T')[0], [])
 
+  const batchEvalMut = useMutation({
+    mutationFn: () => autoEvaluateBatch(agentId, { limit: 50 }),
+    onSuccess: (data) => {
+      toast.success(`Auto-evaluation started — ${data.actions_pending} action(s) queued`)
+      setTimeout(() => void qc.invalidateQueries({ queryKey: ['eval-summary', agentId] }), 3000)
+    },
+    onError: () => toast.error('Failed to start auto-evaluation'),
+  })
+
   const { data: summary, isLoading: summaryLoading } = useQuery({
     queryKey: ['eval-summary', agentId],
     queryFn: () => getEvaluationSummary(agentId),
@@ -508,11 +520,45 @@ export function EvaluationsTab({ agentId }: { agentId: string }) {
   }
 
   if (!summary || summary.total_evaluations === 0) {
-    return <EmptyState icon={Star} title="No evaluations yet" description="Evaluations appear after actions receive ratings." />
+    return (
+      <div className="flex flex-col items-center gap-4 py-12">
+        <EmptyState icon={Star} title="No evaluations yet" description="Evaluations appear after actions receive ratings." />
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => batchEvalMut.mutate()}
+          disabled={batchEvalMut.isPending}
+        >
+          <Bot className="h-4 w-4 mr-2" />
+          {batchEvalMut.isPending ? 'Starting…' : 'Auto-evaluate pending actions'}
+        </Button>
+      </div>
+    )
   }
 
   return (
     <div className="space-y-6 py-4">
+      {/* Header with batch button */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1">
+            <Bot className="h-3.5 w-3.5" />Auto: {summary.auto_evaluated_count}
+          </span>
+          <span className="flex items-center gap-1">
+            <Zap className="h-3.5 w-3.5" />Human: {summary.human_evaluated_count}
+          </span>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => batchEvalMut.mutate()}
+          disabled={batchEvalMut.isPending}
+        >
+          <Bot className="h-3.5 w-3.5 mr-1.5" />
+          {batchEvalMut.isPending ? 'Starting…' : 'Auto-evaluate pending'}
+        </Button>
+      </div>
+
       {/* KPI cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Card>
@@ -625,6 +671,49 @@ export function EvaluationsTab({ agentId }: { agentId: string }) {
                           ? `${((v.thumbs_up / (v.thumbs_up + v.thumbs_down)) * 100).toFixed(0)}%`
                           : '—'}
                       </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Criteria averages from auto-evaluations */}
+      {summary.criteria_averages && Object.keys(summary.criteria_averages).length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Bot className="h-4 w-4 text-primary" />
+              Criteria Averages (Auto-evaluated)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <table className="w-full text-sm">
+              <thead className="border-b border-border bg-muted/30">
+                <tr>
+                  <th className="px-4 py-2 text-left text-xs text-muted-foreground font-medium">Criterion</th>
+                  <th className="px-4 py-2 text-right text-xs text-muted-foreground font-medium">Avg Score</th>
+                  <th className="px-4 py-2 text-xs text-muted-foreground font-medium w-32">Distribution</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(summary.criteria_averages).map(([criterion, avg]) => (
+                  <tr key={criterion} className="border-b border-border/50">
+                    <td className="px-4 py-2.5 text-xs font-medium capitalize">{criterion}</td>
+                    <td className="px-4 py-2.5 text-right">
+                      <span className={`text-xs font-mono ${avg >= 4 ? 'text-emerald-400' : avg >= 3 ? 'text-amber-400' : 'text-red-400'}`}>
+                        {avg.toFixed(2)} / 5
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${avg >= 4 ? 'bg-emerald-500' : avg >= 3 ? 'bg-amber-500' : 'bg-red-500'}`}
+                          style={{ width: `${(avg / 5) * 100}%` }}
+                        />
+                      </div>
                     </td>
                   </tr>
                 ))}

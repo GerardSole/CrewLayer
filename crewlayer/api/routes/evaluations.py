@@ -1,11 +1,14 @@
 """Evaluation, anomaly and A/B test endpoints."""
 from __future__ import annotations
 
+import asyncio
+import contextlib
+import logging
 import uuid
 from datetime import UTC, date, datetime, timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, status
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,6 +21,10 @@ from crewlayer.api.schemas.evaluations import (
     ABTestResultsResponse,
     AnomalyListResponse,
     AnomalyResponse,
+    AutoEvaluateRequest,
+    AutoEvaluateResponse,
+    BatchAutoEvaluateRequest,
+    BatchAutoEvaluateResponse,
     DayTrend,
     EvaluationCreate,
     EvaluationListResponse,
@@ -33,8 +40,12 @@ from crewlayer.core.evaluation.abtesting import (
     PromptVersionNotFoundError,
 )
 from crewlayer.core.evaluation.anomalies import AnomalyManager
+from crewlayer.core.evaluation.autojudge import auto_evaluate, batch_auto_evaluate
 from crewlayer.core.evaluation.ratings import ActionNotFoundError, RatingsManager
-from crewlayer.db.models import Agent, Evaluation, RatingThumbsEnum
+from crewlayer.core.webhooks.dispatcher import dispatch
+from crewlayer.db.models import Action, Agent, Evaluation, EvaluatorEnum, RatingThumbsEnum
+
+log = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -88,6 +99,170 @@ async def submit_evaluation(
     await db.commit()
     await db.refresh(ev)
     return EvaluationResponse.model_validate(ev)
+
+
+async def _batch_auto_evaluate_bg(
+    tenant_id: uuid.UUID,
+    agent_id: uuid.UUID,
+    limit: int,
+    since: datetime | None,
+    criteria: list[str] | None,
+) -> None:
+    """Run batch auto-evaluation in a dedicated NullPool session."""
+    import logging as _logging
+
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+    from sqlalchemy.pool import NullPool
+
+    from crewlayer.core.config import settings as _settings
+
+    _log = _logging.getLogger(__name__)
+    bg_engine = create_async_engine(_settings.DATABASE_URL, poolclass=NullPool)
+    BGSession = async_sessionmaker(bg_engine, expire_on_commit=False)
+    try:
+        async with BGSession() as db:
+            count = await batch_auto_evaluate(
+                db, tenant_id, agent_id, limit=limit, since=since, criteria=criteria
+            )
+            await db.commit()
+            _log.info("Batch auto-evaluate: created %d evaluations for agent %s", count, agent_id)
+        asyncio.create_task(
+            dispatch(tenant_id, "evaluation.batch_completed", {
+                "agent_id": str(agent_id),
+                "count": count,
+            })
+        )
+    except Exception:
+        _log.exception("Batch auto-evaluate background task failed for agent %s", agent_id)
+    finally:
+        with contextlib.suppress(Exception):
+            await bg_engine.dispose()
+
+
+@router.post(
+    "/agents/{agent_id}/actions/{action_id}/auto-evaluate",
+    status_code=status.HTTP_201_CREATED,
+    response_model=AutoEvaluateResponse,
+    dependencies=[check_scope("actions:write")],
+)
+async def auto_evaluate_action(
+    agent_id: uuid.UUID,
+    action_id: uuid.UUID,
+    body: AutoEvaluateRequest,
+    tenant: TenantDep,
+    db: DbDep,
+) -> AutoEvaluateResponse:
+    """Auto-evaluate an action using Claude as judge (LLM-as-a-judge)."""
+    await _get_agent(agent_id, tenant.id, db)
+
+    result = await db.execute(
+        select(Action).where(
+            Action.id == action_id,
+            Action.tenant_id == tenant.id,
+            Action.agent_id == agent_id,
+        )
+    )
+    action = result.scalar_one_or_none()
+    if action is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Acción no encontrada")
+
+    judge_result = await auto_evaluate(action, body.criteria)
+
+    ev = Evaluation(
+        tenant_id=tenant.id,
+        agent_id=agent_id,
+        action_id=action_id,
+        session_id=action.session_id,
+        prompt_version_id=action.prompt_version_id,
+        rating_score=judge_result.score,
+        rating_thumbs=(
+            RatingThumbsEnum.up if judge_result.thumbs == "up" else RatingThumbsEnum.down
+        ),
+        evaluator=EvaluatorEnum.auto,
+        notes=judge_result.reasoning,
+        criteria_scores=judge_result.criteria_scores,
+    )
+    db.add(ev)
+    await db.commit()
+    await db.refresh(ev)
+
+    asyncio.create_task(
+        dispatch(tenant.id, "evaluation.auto_completed", {
+            "action_id": str(action_id),
+            "agent_id": str(agent_id),
+            "score": judge_result.score,
+        })
+    )
+
+    return AutoEvaluateResponse(
+        evaluation_id=ev.id,
+        action_id=action_id,
+        score=judge_result.score,
+        thumbs=judge_result.thumbs,
+        reasoning=judge_result.reasoning,
+        criteria_scores=judge_result.criteria_scores,
+    )
+
+
+@router.post(
+    "/agents/{agent_id}/actions/auto-evaluate-batch",
+    response_model=BatchAutoEvaluateResponse,
+    dependencies=[check_scope("actions:write")],
+)
+async def auto_evaluate_batch(
+    agent_id: uuid.UUID,
+    body: BatchAutoEvaluateRequest,
+    tenant: TenantDep,
+    db: DbDep,
+    background_tasks: BackgroundTasks,
+) -> BatchAutoEvaluateResponse:
+    """Kick off background batch auto-evaluation for actions without an auto-evaluation.
+
+    Returns immediately with the count of pending actions. Actual evaluation
+    runs asynchronously using Claude as judge.
+    """
+    await _get_agent(agent_id, tenant.id, db)
+
+    since: datetime | None = None
+    if body.since:
+        try:
+            since = datetime.fromisoformat(body.since)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="since must be an ISO 8601 datetime string",
+            )
+
+    already_auto = select(Evaluation.action_id).where(
+        Evaluation.tenant_id == tenant.id,
+        Evaluation.agent_id == agent_id,
+        Evaluation.evaluator == EvaluatorEnum.auto,
+    )
+    pending_stmt = (
+        select(func.count())
+        .select_from(Action)
+        .where(
+            Action.tenant_id == tenant.id,
+            Action.agent_id == agent_id,
+            Action.id.not_in(already_auto),
+        )
+    )
+    if since:
+        pending_stmt = pending_stmt.where(Action.created_at >= since)
+
+    actions_pending = int((await db.execute(pending_stmt)).scalar_one() or 0)
+    capped = min(actions_pending, body.limit)
+
+    background_tasks.add_task(
+        _batch_auto_evaluate_bg,
+        tenant.id,
+        agent_id,
+        body.limit,
+        since,
+        body.criteria,
+    )
+
+    return BatchAutoEvaluateResponse(job_started=True, actions_pending=capped)
 
 
 @router.get(
@@ -190,6 +365,9 @@ async def get_evaluation_summary(
             )
             for v in scores.by_prompt_version
         ],
+        auto_evaluated_count=scores.auto_evaluated_count,
+        human_evaluated_count=scores.human_evaluated_count,
+        criteria_averages=scores.criteria_averages,
     )
 
 

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Any
 
@@ -38,6 +38,9 @@ class AgentScores:
     thumbs_down: int
     thumbs_up_ratio: float
     by_prompt_version: list[VersionScores]
+    auto_evaluated_count: int = 0
+    human_evaluated_count: int = 0
+    criteria_averages: dict[str, float] = field(default_factory=dict)
 
 
 class RatingsManager:
@@ -118,6 +121,12 @@ class RatingsManager:
                     func.sum(
                         case((Evaluation.rating_thumbs == RatingThumbsEnum.down, 1), else_=0)
                     ).label("thumbs_down"),
+                    func.sum(
+                        case((Evaluation.evaluator == EvaluatorEnum.auto, 1), else_=0)
+                    ).label("auto_count"),
+                    func.sum(
+                        case((Evaluation.evaluator == EvaluatorEnum.human, 1), else_=0)
+                    ).label("human_count"),
                 ).where(*conditions)
             )
         ).one()
@@ -127,6 +136,8 @@ class RatingsManager:
         thumbs_down: int = int(row.thumbs_down or 0)
         thumbs_total = thumbs_up + thumbs_down
         thumbs_up_ratio = thumbs_up / thumbs_total if thumbs_total > 0 else 0.0
+        auto_count: int = int(row.auto_count or 0)
+        human_count: int = int(row.human_count or 0)
 
         version_rows = (
             await self._db.execute(
@@ -157,6 +168,24 @@ class RatingsManager:
             for r in version_rows
         ]
 
+        # Aggregate per-criterion averages from criteria_scores JSONB rows
+        cs_rows = (
+            await self._db.execute(
+                select(Evaluation.criteria_scores).where(
+                    *conditions,
+                    Evaluation.criteria_scores.isnot(None),
+                )
+            )
+        ).scalars().all()
+        criteria_sums: dict[str, list[float]] = {}
+        for cs in cs_rows:
+            if cs:
+                for k, v in cs.items():
+                    criteria_sums.setdefault(k, []).append(float(v))
+        criteria_averages = {
+            k: round(sum(v) / len(v), 3) for k, v in criteria_sums.items()
+        }
+
         return AgentScores(
             agent_id=str(agent_id),
             count=total,
@@ -165,6 +194,9 @@ class RatingsManager:
             thumbs_down=thumbs_down,
             thumbs_up_ratio=thumbs_up_ratio,
             by_prompt_version=by_version,
+            auto_evaluated_count=auto_count,
+            human_evaluated_count=human_count,
+            criteria_averages=criteria_averages,
         )
 
     async def list_evaluations(

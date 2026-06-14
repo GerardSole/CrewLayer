@@ -1,5 +1,7 @@
 import { getClient } from './client'
 import type {
+  AutoEvaluateResponse,
+  BatchAutoEvaluateResponse,
   Evaluation,
   EvaluationSummary,
   AnomalyListResponse,
@@ -58,6 +60,29 @@ export async function submitEvaluation(
 ): Promise<Evaluation> {
   const { data } = await getClient().post<Evaluation>(
     `/v1/agents/${agentId}/actions/${actionId}/evaluate`,
+    body,
+  )
+  return data
+}
+
+export async function autoEvaluate(
+  agentId: string,
+  actionId: string,
+  criteria?: string[],
+): Promise<AutoEvaluateResponse> {
+  const { data } = await getClient().post<AutoEvaluateResponse>(
+    `/v1/agents/${agentId}/actions/${actionId}/auto-evaluate`,
+    { criteria },
+  )
+  return data
+}
+
+export async function autoEvaluateBatch(
+  agentId: string,
+  body: { limit?: number; since?: string; criteria?: string[] } = {},
+): Promise<BatchAutoEvaluateResponse> {
+  const { data } = await getClient().post<BatchAutoEvaluateResponse>(
+    `/v1/agents/${agentId}/actions/auto-evaluate-batch`,
     body,
   )
   return data
