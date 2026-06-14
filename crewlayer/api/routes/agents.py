@@ -124,7 +124,11 @@ class AlertsConfigUpdate(BaseModel):
 # ---------------------------------------------------------------------------
 
 async def _get_agent_or_404(agent_id: uuid.UUID, tenant_id: uuid.UUID, db: DbDep) -> Agent:
-    result = await db.execute(select(Agent).where(Agent.id == agent_id, Agent.tenant_id == tenant_id))
+    result = await db.execute(
+        select(Agent)
+        .where(Agent.id == agent_id, Agent.tenant_id == tenant_id)
+        .execution_options(populate_existing=True)
+    )
     agent = result.scalar_one_or_none()
     if agent is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agente no encontrado")
@@ -268,7 +272,7 @@ async def list_agents(
         if tag_list:
             # PostgreSQL: tags @> ARRAY['tag1','tag2'] — all listed tags must be present
             stmt = stmt.where(Agent.tags.contains(cast(tag_list, ARRAY(String))))
-    rows = (await db.execute(stmt)).scalars().all()
+    rows = (await db.execute(stmt.execution_options(populate_existing=True))).scalars().all()
     return [AgentResponse.model_validate(a) for a in rows]
 
 
