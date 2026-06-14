@@ -52,10 +52,16 @@ services:
       MCP_TRANSPORT: sse
       CREWLAYER_BASE_URL: http://api:8000
     depends_on:
-      - api
+      api:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       - .:/app
     command: python mcp/server.py
+    restart: unless-stopped
 
 volumes:
   pgdata:
