@@ -339,7 +339,7 @@ async def create_memory(
     await db.commit()
     await db.refresh(mem)
     asyncio.create_task(
-        dispatch(tenant.id, "memory.created", {"agent_id": str(agent_id), "memory_id": str(mem.id)})
+        dispatch(tenant.id, "memory.saved", {"agent_id": str(agent_id), "memory_id": str(mem.id)})
     )
     return MemoryResponse.model_validate(mem)
 

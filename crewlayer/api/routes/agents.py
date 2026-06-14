@@ -24,6 +24,7 @@ from crewlayer.core.agents.status import (
     cache_status,
     read_cached_status,
 )
+from crewlayer.core.webhooks.dispatcher import dispatch
 from crewlayer.db.models import Agent, AgentRelationTypeEnum, AgentStatusEnum
 
 router = APIRouter()
@@ -438,6 +439,12 @@ async def update_agent_status(
     await db.commit()
     await db.refresh(agent)
     await cache_status(agent.id, agent.status, agent.current_session_id, agent.status_updated_at, redis)
+    asyncio.create_task(
+        dispatch(tenant.id, "agent.status_changed", {
+            "agent_id": str(agent_id),
+            "status": agent.status.value,
+        })
+    )
     return AgentStatusResponse(
         agent_id=agent.id,
         status=agent.status,

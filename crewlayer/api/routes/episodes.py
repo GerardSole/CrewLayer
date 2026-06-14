@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from datetime import datetime
 from typing import Annotated, Any
@@ -8,6 +9,7 @@ from sqlalchemy import select
 
 from crewlayer.api.deps import DbDep, RedisDep, TenantDep, check_scope
 from crewlayer.core.memory.episodic import EpisodeNotFoundError, EpisodicMemory
+from crewlayer.core.webhooks.dispatcher import dispatch
 from crewlayer.db.models import Agent, Episode, EpisodeStatusEnum
 
 router = APIRouter()
@@ -221,6 +223,13 @@ async def complete_episode(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Episodio no encontrado")
     await db.commit()
     await db.refresh(episode)
+    asyncio.create_task(
+        dispatch(tenant.id, "episode.completed", {
+            "agent_id": str(agent_id),
+            "episode_id": str(episode_id),
+            "summary": episode.summary,
+        })
+    )
     return EpisodeResponse.from_orm(episode)
 
 
