@@ -63,6 +63,15 @@ def _check(response: httpx.Response) -> Any:
     return response.json()
 
 
+def _set_status(agent_id: str, status: str) -> None:
+    """Update agent status; never raises so it never breaks the calling tool."""
+    try:
+        with _http() as c:
+            c.patch(f"/v1/agents/{agent_id}/status", json={"status": status})
+    except Exception:
+        pass
+
+
 # ---------------------------------------------------------------------------
 # Memory
 # ---------------------------------------------------------------------------
@@ -80,12 +89,16 @@ def memory_recall(agent_id: str, query: str, top_k: int = 10) -> str:
     Returns:
         JSON list of matching memory objects with content and similarity scores.
     """
-    with _http() as c:
-        data = _check(c.post(
-            f"/v1/agents/{agent_id}/memory/recall",
-            json={"query": query, "limit": top_k},
-        ))
-    return json.dumps(data)
+    _set_status(agent_id, "working")
+    try:
+        with _http() as c:
+            data = _check(c.post(
+                f"/v1/agents/{agent_id}/memory/recall",
+                json={"query": query, "limit": top_k},
+            ))
+        return json.dumps(data)
+    finally:
+        _set_status(agent_id, "idle")
 
 
 @mcp.tool()
@@ -101,13 +114,17 @@ def memory_append(agent_id: str, session_id: str, role: str, content: str) -> st
     Returns:
         JSON confirmation with session_id and updated message count.
     """
-    with _http() as c:
-        data = _check(c.post(
-            f"/v1/agents/{agent_id}/memory/messages",
-            params={"session_id": session_id},
-            json={"role": role, "content": content},
-        ))
-    return json.dumps(data)
+    _set_status(agent_id, "working")
+    try:
+        with _http() as c:
+            data = _check(c.post(
+                f"/v1/agents/{agent_id}/memory/messages",
+                params={"session_id": session_id},
+                json={"role": role, "content": content},
+            ))
+        return json.dumps(data)
+    finally:
+        _set_status(agent_id, "idle")
 
 
 @mcp.tool()
@@ -124,9 +141,13 @@ def memory_extract(agent_id: str, session_id: str) -> str:
     Returns:
         JSON with the closed session record and count of extracted memories.
     """
-    with _http() as c:
-        data = _check(c.post(f"/v1/sessions/{session_id}/close"))
-    return json.dumps(data)
+    _set_status(agent_id, "working")
+    try:
+        with _http() as c:
+            data = _check(c.post(f"/v1/sessions/{session_id}/close"))
+        return json.dumps(data)
+    finally:
+        _set_status(agent_id, "idle")
 
 
 # ---------------------------------------------------------------------------
@@ -168,9 +189,13 @@ def action_log(
         body["duration_ms"] = duration_ms
     if session_id is not None:
         body["session_id"] = session_id
-    with _http() as c:
-        data = _check(c.post(f"/v1/agents/{agent_id}/actions", json=body))
-    return json.dumps(data)
+    _set_status(agent_id, "working")
+    try:
+        with _http() as c:
+            data = _check(c.post(f"/v1/agents/{agent_id}/actions", json=body))
+        return json.dumps(data)
+    finally:
+        _set_status(agent_id, "idle")
 
 
 @mcp.tool()
@@ -200,9 +225,13 @@ def action_list(
         params["status"] = status
     if cursor:
         params["cursor"] = cursor
-    with _http() as c:
-        data = _check(c.get(f"/v1/agents/{agent_id}/actions", params=params))
-    return json.dumps(data)
+    _set_status(agent_id, "working")
+    try:
+        with _http() as c:
+            data = _check(c.get(f"/v1/agents/{agent_id}/actions", params=params))
+        return json.dumps(data)
+    finally:
+        _set_status(agent_id, "idle")
 
 
 # ---------------------------------------------------------------------------
@@ -211,7 +240,12 @@ def action_list(
 
 
 @mcp.tool()
-def context_write(namespace: str, key: str, value: Any) -> str:
+def context_write(
+    namespace: str,
+    key: str,
+    value: Any,
+    agent_id: str | None = None,
+) -> str:
     """Write a value to the shared context blackboard.
 
     The blackboard is a multi-agent coordination store. Any agent in the same
@@ -221,33 +255,51 @@ def context_write(namespace: str, key: str, value: Any) -> str:
         namespace: Logical grouping for related keys (e.g., 'project', 'pipeline').
         key: Key name within the namespace.
         value: Any JSON-serialisable value to store.
+        agent_id: UUID of the calling agent (optional; used for status tracking).
 
     Returns:
         JSON with the stored entry including version number.
     """
-    with _http() as c:
-        data = _check(c.put(
-            f"/v1/context/{namespace}/{key}",
-            json={"value": value},
-        ))
-    return json.dumps(data)
+    if agent_id:
+        _set_status(agent_id, "working")
+    try:
+        with _http() as c:
+            data = _check(c.put(
+                f"/v1/context/{namespace}/{key}",
+                json={"value": value},
+            ))
+        return json.dumps(data)
+    finally:
+        if agent_id:
+            _set_status(agent_id, "idle")
 
 
 @mcp.tool()
-def context_read(namespace: str, key: str) -> str:
+def context_read(
+    namespace: str,
+    key: str,
+    agent_id: str | None = None,
+) -> str:
     """Read a value from the shared context blackboard.
 
     Args:
         namespace: Logical grouping for the key.
         key: Key name within the namespace.
+        agent_id: UUID of the calling agent (optional; used for status tracking).
 
     Returns:
         JSON with the stored value, version, and metadata.
         Raises an error if the key does not exist (404).
     """
-    with _http() as c:
-        data = _check(c.get(f"/v1/context/{namespace}/{key}"))
-    return json.dumps(data)
+    if agent_id:
+        _set_status(agent_id, "working")
+    try:
+        with _http() as c:
+            data = _check(c.get(f"/v1/context/{namespace}/{key}"))
+        return json.dumps(data)
+    finally:
+        if agent_id:
+            _set_status(agent_id, "idle")
 
 
 # ---------------------------------------------------------------------------
@@ -267,9 +319,13 @@ def agent_status(agent_id: str) -> str:
     Returns:
         JSON with status ('idle'/'working'/'error'), current_session_id, and updated_at.
     """
-    with _http() as c:
-        data = _check(c.get(f"/v1/agents/{agent_id}/status"))
-    return json.dumps(data)
+    _set_status(agent_id, "working")
+    try:
+        with _http() as c:
+            data = _check(c.get(f"/v1/agents/{agent_id}/status"))
+        return json.dumps(data)
+    finally:
+        _set_status(agent_id, "idle")
 
 
 @mcp.tool()
@@ -291,9 +347,13 @@ def agent_set_status(
     body: dict[str, Any] = {"status": status}
     if session_id:
         body["session_id"] = session_id
-    with _http() as c:
-        data = _check(c.patch(f"/v1/agents/{agent_id}/status", json=body))
-    return json.dumps(data)
+    _set_status(agent_id, "working")
+    try:
+        with _http() as c:
+            data = _check(c.patch(f"/v1/agents/{agent_id}/status", json=body))
+        return json.dumps(data)
+    finally:
+        _set_status(agent_id, "idle")
 
 
 # ---------------------------------------------------------------------------
