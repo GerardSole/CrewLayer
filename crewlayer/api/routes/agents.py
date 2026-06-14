@@ -433,42 +433,38 @@ async def update_agent_status(
     redis: RedisDep,
 ) -> AgentStatusResponse:
     """Update the runtime status of an agent (idle / working / error)."""
-    # 404 guard — also enforces tenant isolation
-    await _get_agent_or_404(agent_id, tenant.id, db)
+    now = datetime.now(UTC)
 
-    # Direct SQL UPDATE bypasses ORM dirty-tracking entirely so repeated calls
-    # within the same session reliably persist to PostgreSQL.
-    await db.execute(
+    # Single UPDATE … RETURNING statement: bypasses ORM dirty-tracking and the
+    # identity map entirely (synchronize_session=False + no pre-load SELECT).
+    # RETURNING Agent.id gives us the 404 check without a second round-trip.
+    result = await db.execute(
         sa_update(Agent)
         .where(Agent.id == agent_id, Agent.tenant_id == tenant.id)
         .values(
             status=body.status,
-            status_updated_at=datetime.now(UTC),
+            status_updated_at=now,
             current_session_id=body.session_id,
         )
+        .returning(Agent.id)
+        .execution_options(synchronize_session=False)
     )
+    if result.one_or_none() is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agente no encontrado")
     await db.commit()
 
-    # Expire the identity map so the SELECT below reads from the DB, not the
-    # stale in-memory object that still has the pre-UPDATE attribute values.
-    db.expire_all()
-    result = await db.execute(
-        select(Agent).where(Agent.id == agent_id, Agent.tenant_id == tenant.id)
-    )
-    agent = result.scalar_one()
-
-    await cache_status(agent.id, agent.status, agent.current_session_id, agent.status_updated_at, redis)
+    await cache_status(agent_id, body.status, body.session_id, now, redis)
     asyncio.create_task(
         dispatch(tenant.id, "agent.status_changed", {
             "agent_id": str(agent_id),
-            "status": agent.status.value,
+            "status": body.status.value,
         })
     )
     return AgentStatusResponse(
-        agent_id=agent.id,
-        status=agent.status,
-        current_session_id=agent.current_session_id,
-        updated_at=agent.status_updated_at,
+        agent_id=agent_id,
+        status=body.status,
+        current_session_id=body.session_id,
+        updated_at=now,
     )
 
 
