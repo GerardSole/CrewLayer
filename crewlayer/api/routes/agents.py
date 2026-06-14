@@ -1,12 +1,12 @@
 import asyncio
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from sqlalchemy import String, cast, func, select, text
+from sqlalchemy import String, cast, func, select, text, update as sa_update
 from sqlalchemy.dialects.postgresql import ARRAY
 
 from crewlayer.api.deps import DbDep, RedisDep, TenantDep, check_scope
@@ -20,7 +20,6 @@ from crewlayer.core.agents.relations import (
     SelfRelationError,
 )
 from crewlayer.core.agents.status import (
-    apply_status,
     cache_status,
     read_cached_status,
 )
@@ -434,11 +433,30 @@ async def update_agent_status(
     redis: RedisDep,
 ) -> AgentStatusResponse:
     """Update the runtime status of an agent (idle / working / error)."""
-    agent = await _get_agent_or_404(agent_id, tenant.id, db)
-    apply_status(agent, body.status, body.session_id)
-    await db.flush()   # explicit flush: ensures dirty-detection fires before commit
+    # 404 guard — also enforces tenant isolation
+    await _get_agent_or_404(agent_id, tenant.id, db)
+
+    # Direct SQL UPDATE bypasses ORM dirty-tracking entirely so repeated calls
+    # within the same session reliably persist to PostgreSQL.
+    await db.execute(
+        sa_update(Agent)
+        .where(Agent.id == agent_id, Agent.tenant_id == tenant.id)
+        .values(
+            status=body.status,
+            status_updated_at=datetime.now(UTC),
+            current_session_id=body.session_id,
+        )
+    )
     await db.commit()
-    await db.refresh(agent)
+
+    # Expire the identity map so the SELECT below reads from the DB, not the
+    # stale in-memory object that still has the pre-UPDATE attribute values.
+    db.expire_all()
+    result = await db.execute(
+        select(Agent).where(Agent.id == agent_id, Agent.tenant_id == tenant.id)
+    )
+    agent = result.scalar_one()
+
     await cache_status(agent.id, agent.status, agent.current_session_id, agent.status_updated_at, redis)
     asyncio.create_task(
         dispatch(tenant.id, "agent.status_changed", {
