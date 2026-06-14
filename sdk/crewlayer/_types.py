@@ -340,6 +340,7 @@ class EvaluationRecord:
     rating_thumbs: str | None = None
     rating_score: float | None = None
     notes: str | None = None
+    criteria_scores: dict[str, float] | None = None
     created_by: str | None = None
 
     @classmethod
@@ -356,7 +357,44 @@ class EvaluationRecord:
             rating_thumbs=d.get("rating_thumbs"),
             rating_score=d.get("rating_score"),
             notes=d.get("notes"),
+            criteria_scores=d.get("criteria_scores"),
             created_by=d.get("created_by"),
+        )
+
+
+@dataclass
+class AutoEvaluateResult:
+    """Result of an LLM-as-a-judge auto-evaluation."""
+    evaluation_id: str
+    action_id: str
+    score: float
+    thumbs: str
+    reasoning: str
+    criteria_scores: dict[str, float]
+
+    @classmethod
+    def _from(cls, d: dict[str, Any]) -> AutoEvaluateResult:
+        return cls(
+            evaluation_id=d["evaluation_id"],
+            action_id=d["action_id"],
+            score=d["score"],
+            thumbs=d["thumbs"],
+            reasoning=d["reasoning"],
+            criteria_scores=d["criteria_scores"],
+        )
+
+
+@dataclass
+class BatchAutoEvaluateResult:
+    """Result of a batch auto-evaluate request."""
+    job_started: bool
+    actions_pending: int
+
+    @classmethod
+    def _from(cls, d: dict[str, Any]) -> BatchAutoEvaluateResult:
+        return cls(
+            job_started=d["job_started"],
+            actions_pending=d["actions_pending"],
         )
 
 
@@ -390,6 +428,9 @@ class EvaluationSummary:
     thumbs_up_ratio: float
     trend_7d: list[DayTrend]
     avg_score: float | None = None
+    auto_evaluated_count: int = 0
+    human_evaluated_count: int = 0
+    criteria_averages: dict[str, float] | None = None
 
     @classmethod
     def _from(cls, d: dict[str, Any]) -> EvaluationSummary:
@@ -401,6 +442,9 @@ class EvaluationSummary:
             thumbs_up_ratio=d["thumbs_up_ratio"],
             trend_7d=[DayTrend._from(t) for t in d.get("trend_7d", [])],
             avg_score=d.get("avg_score"),
+            auto_evaluated_count=d.get("auto_evaluated_count", 0),
+            human_evaluated_count=d.get("human_evaluated_count", 0),
+            criteria_averages=d.get("criteria_averages"),
         )
 
 

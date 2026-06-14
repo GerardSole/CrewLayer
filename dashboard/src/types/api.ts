@@ -254,6 +254,9 @@ export interface EvaluationSummary {
     thumbs_up: number
     thumbs_down: number
   }>
+  auto_evaluated_count: number
+  human_evaluated_count: number
+  criteria_averages?: Record<string, number>
 }
 
 export interface Anomaly {
@@ -375,10 +378,25 @@ export interface Evaluation {
   prompt_version_id?: string
   rating_thumbs?: 'up' | 'down'
   rating_score?: number
-  evaluator: string
+  evaluator: 'human' | 'auto'
   notes?: string
+  criteria_scores?: Record<string, number>
   created_at: string
   created_by?: string
+}
+
+export interface AutoEvaluateResponse {
+  evaluation_id: string
+  action_id: string
+  score: number
+  thumbs: 'up' | 'down'
+  reasoning: string
+  criteria_scores: Record<string, number>
+}
+
+export interface BatchAutoEvaluateResponse {
+  job_started: boolean
+  actions_pending: number
 }
 
 // ── A/B Tests ────────────────────────────────────────────────────────────────

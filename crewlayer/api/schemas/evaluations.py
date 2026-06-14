@@ -36,6 +36,7 @@ class EvaluationResponse(BaseModel):
     rating_score: float | None = None
     evaluator: EvaluatorEnum
     notes: str | None = None
+    criteria_scores: dict[str, float] | None = None
     created_at: datetime
     created_by: uuid.UUID | None = None
 
@@ -72,6 +73,35 @@ class EvaluationSummaryResponse(BaseModel):
     thumbs_up_ratio: float
     trend_7d: list[DayTrend]
     by_prompt_version: list[VersionScoreResponse]
+    auto_evaluated_count: int = 0
+    human_evaluated_count: int = 0
+    criteria_averages: dict[str, float] = {}
+
+
+class AutoEvaluateRequest(BaseModel):
+    criteria: list[str] | None = None
+
+
+class AutoEvaluateResponse(BaseModel):
+    evaluation_id: uuid.UUID
+    action_id: uuid.UUID
+    score: float
+    thumbs: str
+    reasoning: str
+    criteria_scores: dict[str, float]
+
+    model_config = {"from_attributes": True}
+
+
+class BatchAutoEvaluateRequest(BaseModel):
+    limit: int = Field(20, ge=1, le=100)
+    since: str | None = None
+    criteria: list[str] | None = None
+
+
+class BatchAutoEvaluateResponse(BaseModel):
+    job_started: bool
+    actions_pending: int
 
 
 # ── Anomalies ─────────────────────────────────────────────────────────────────

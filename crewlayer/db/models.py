@@ -597,6 +597,7 @@ class Evaluation(Base):
         server_default=EvaluatorEnum.human.value,
     )
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    criteria_scores: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), nullable=False, server_default=func.now()
     )
