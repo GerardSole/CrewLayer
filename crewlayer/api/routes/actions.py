@@ -84,7 +84,7 @@ async def _detect_anomalies_bg(
                     if anomaly.severity == AnomalySeverityEnum.high:
                         await dispatch(
                             tenant_id,
-                            "evaluation.anomaly_detected",
+                            "anomaly.detected",
                             {
                                 "anomaly_id": str(anomaly.id),
                                 "agent_id": str(agent_id),
@@ -174,7 +174,7 @@ async def log_action(
     }
     asyncio.create_task(dispatch(tenant.id, "action.logged", _webhook_payload))
     if action.status in (ActionStatus.error, ActionStatus.timeout):
-        asyncio.create_task(dispatch(tenant.id, "action.failed", _webhook_payload))
+        asyncio.create_task(dispatch(tenant.id, "action.error", _webhook_payload))
     await check_and_fire_alerts(
         tenant_id=tenant.id,
         agent_id=agent_id,
