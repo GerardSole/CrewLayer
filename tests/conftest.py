@@ -1,6 +1,8 @@
 import contextlib
+import os
 from collections.abc import AsyncGenerator
 
+import pytest
 import pytest_asyncio
 import redis.asyncio as aioredis
 import sqlalchemy as sa
@@ -10,6 +12,35 @@ from sqlalchemy.pool import NullPool
 
 from crewlayer.api.middleware import audit as _audit_middleware
 from crewlayer.core.config import settings
+
+# ---------------------------------------------------------------------------
+# Safety guard: refuse to run against the production database.
+#
+# Tests delete ALL rows after each case.  Running against a production DB
+# (or any DB that isn't named *test* / *_test* / pointed to via
+# CREWLAYER_TEST_DATABASE_URL) would wipe real data.
+#
+# To override intentionally set CREWLAYER_ALLOW_PROD_DB_TESTS=1 in the env.
+# ---------------------------------------------------------------------------
+_db_url: str = settings.DATABASE_URL
+_test_db_url: str = os.environ.get("CREWLAYER_TEST_DATABASE_URL", "")
+
+if _test_db_url:
+    _db_url = _test_db_url
+
+_ALLOW_PROD = os.environ.get("CREWLAYER_ALLOW_PROD_DB_TESTS", "0").strip() == "1"
+_db_name = _db_url.split("/")[-1].split("?")[0]  # last path segment
+if not _ALLOW_PROD and "test" not in _db_name.lower():
+    raise RuntimeError(
+        f"\n\n"
+        f"  ✗ SAFETY GUARD: tests would run against '{_db_name}' which does not\n"
+        f"    contain 'test' in its name.  Tests DELETE ALL ROWS on cleanup and\n"
+        f"    would wipe production data.\n\n"
+        f"  Options:\n"
+        f"    1. Set CREWLAYER_TEST_DATABASE_URL=postgresql+asyncpg://user:pass@host/crewlayer_test\n"
+        f"    2. Set CREWLAYER_ALLOW_PROD_DB_TESTS=1  (dangerous — only for CI with a\n"
+        f"       throwaway DB that happens not to contain 'test' in its name)\n"
+    )
 from crewlayer.core.redis import get_redis
 from crewlayer.core.streaming.context_broker import ContextBroker
 from crewlayer.db.models import (
@@ -40,7 +71,7 @@ from main import app
 
 # Module-level engine shared across all tests in the session.
 # NullPool prevents connection reuse across async event-loop boundaries.
-_engine = create_async_engine(settings.DATABASE_URL, poolclass=NullPool)
+_engine = create_async_engine(_db_url, poolclass=NullPool)
 _TestSession = async_sessionmaker(_engine, expire_on_commit=False)
 
 # Deletion order respects FK constraints (children before parents)
