@@ -394,7 +394,6 @@ def context_read(
 
 
 @mcp.tool()
-@auto_log
 def agent_status(agent_id: str) -> str:
     """Get the current runtime status of an agent.
 
@@ -412,7 +411,6 @@ def agent_status(agent_id: str) -> str:
 
 
 @mcp.tool()
-@auto_log
 def agent_set_status(
     agent_id: str,
     status: str,
