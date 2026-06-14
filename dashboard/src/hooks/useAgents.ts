@@ -27,7 +27,7 @@ export function useAgent(agentId: string) {
   })
 }
 
-export function useAgentStatus(agentId: string, refetchInterval = 10_000) {
+export function useAgentStatus(agentId: string, refetchInterval = 1_000) {
   return useQuery({
     queryKey: ['agent-status', agentId],
     queryFn: () => getAgentStatus(agentId),
