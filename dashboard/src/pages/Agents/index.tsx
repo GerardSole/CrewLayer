@@ -4,8 +4,8 @@ import { useQuery } from '@tanstack/react-query'
 import { Search, Plus, RefreshCw, Bot, ChevronRight, X } from 'lucide-react'
 import { toast } from 'sonner'
 
-import { listAgents, listAgentTags } from '@/api/agents'
-import { useCreateAgent } from '@/hooks/useAgents'
+import { listAgentTags } from '@/api/agents'
+import { useAgents, useCreateAgent } from '@/hooks/useAgents'
 import { Sheet } from '@/components/ui/sheet'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
@@ -270,11 +270,7 @@ export default function AgentsPage() {
   const [tagFilter, setTagFilter] = useState<string[]>([])
   const [drawerOpen, setDrawerOpen] = useState(false)
 
-  const { data: allAgents = [], isLoading, refetch } = useQuery({
-    queryKey: ['agents'],
-    queryFn: () => listAgents(),
-    staleTime: 30_000,
-  })
+  const { data: allAgents = [], isLoading, refetch } = useAgents()
 
   const { data: tagCounts = [] } = useQuery({
     queryKey: ['agent-tags'],

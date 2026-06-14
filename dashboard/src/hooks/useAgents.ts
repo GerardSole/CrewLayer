@@ -15,7 +15,7 @@ export function useAgents(params?: { status?: string; tags?: string }) {
   return useQuery({
     queryKey: ['agents', params],
     queryFn: () => listAgents(params),
-    staleTime: 30_000,
+    refetchInterval: 2_000,
   })
 }
 
