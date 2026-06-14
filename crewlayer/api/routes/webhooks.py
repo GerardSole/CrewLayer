@@ -1,5 +1,10 @@
+import hashlib
+import hmac
+import json
 import uuid
+from datetime import UTC, datetime
 
+import httpx
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
@@ -9,9 +14,10 @@ from crewlayer.api.schemas.webhooks import (
     DeliveryResponse,
     WebhookCreate,
     WebhookResponse,
+    WebhookTestResponse,
     WebhookUpdate,
 )
-from crewlayer.db.models import WebhookDelivery, WebhookEndpoint
+from crewlayer.db.models import DeliveryStatus, WebhookDelivery, WebhookEndpoint
 
 router = APIRouter()
 
@@ -82,6 +88,61 @@ async def delete_webhook(webhook_id: uuid.UUID, tenant: TenantDep, db: DbDep) ->
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Webhook no encontrado")
     await db.delete(endpoint)
     await db.commit()
+
+
+@router.post("/webhooks/{webhook_id}/test", response_model=WebhookTestResponse)
+async def test_webhook(webhook_id: uuid.UUID, tenant: TenantDep, db: DbDep) -> WebhookTestResponse:
+    """Send a test payload to a webhook endpoint and record the delivery."""
+    result = await db.execute(
+        select(WebhookEndpoint).where(
+            WebhookEndpoint.id == webhook_id,
+            WebhookEndpoint.tenant_id == tenant.id,
+        )
+    )
+    endpoint = result.scalar_one_or_none()
+    if endpoint is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Webhook no encontrado")
+
+    payload: dict = {
+        "event": "test",
+        "webhook_id": str(webhook_id),
+        "timestamp": datetime.now(UTC).isoformat(),
+        "message": "This is a test delivery from CrewLayer.",
+    }
+    body = json.dumps(payload, default=str).encode()
+    sig = "sha256=" + hmac.new(endpoint.secret.encode(), body, hashlib.sha256).hexdigest()
+    headers = {
+        "Content-Type": "application/json",
+        "X-AgentLayer-Signature": sig,
+        "X-AgentLayer-Event": "test",
+    }
+
+    response_status: int | None = None
+    ok = False
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            r = await client.post(endpoint.url, content=body, headers=headers)
+            response_status = r.status_code
+            ok = r.status_code < 300
+    except Exception:
+        pass
+
+    delivery = WebhookDelivery(
+        webhook_id=endpoint.id,
+        event="test",
+        payload=payload,
+        status=DeliveryStatus.success if ok else DeliveryStatus.failed,
+        attempts=1,
+        last_attempt_at=datetime.now(UTC),
+        response_status=response_status,
+    )
+    db.add(delivery)
+    await db.commit()
+
+    return WebhookTestResponse(
+        status="delivered" if ok else "failed",
+        response_status=response_status,
+    )
 
 
 @router.get("/webhooks/{webhook_id}/deliveries", response_model=DeliveryListResponse)

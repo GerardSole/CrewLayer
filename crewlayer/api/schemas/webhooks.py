@@ -43,3 +43,8 @@ class DeliveryListResponse(BaseModel):
 
 class WebhookUpdate(BaseModel):
     active: bool | None = None
+
+
+class WebhookTestResponse(BaseModel):
+    status: str
+    response_status: int | None
