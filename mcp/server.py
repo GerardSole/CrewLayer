@@ -151,9 +151,6 @@ def auto_log(fn: Any) -> Any:
         agent_id: str | None = all_params.get("agent_id")
         tool_name: str = fn.__name__
 
-        if agent_id:
-            _set_status(agent_id, "working")
-
         start = time.monotonic()
         output_dict: dict[str, Any] = {}
         exc: BaseException | None = None
@@ -178,7 +175,6 @@ def auto_log(fn: Any) -> Any:
                     status=action_status,
                     duration_ms=duration_ms,
                 )
-                _set_status(agent_id, "idle")
 
     return wrapper
 
