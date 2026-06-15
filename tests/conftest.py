@@ -2,7 +2,6 @@ import contextlib
 import os
 from collections.abc import AsyncGenerator
 
-import pytest
 import pytest_asyncio
 import redis.asyncio as aioredis
 import sqlalchemy as sa
@@ -41,9 +40,9 @@ if not _ALLOW_PROD and "test" not in _db_name.lower():
         f"    2. Set CREWLAYER_ALLOW_PROD_DB_TESTS=1  (dangerous — only for CI with a\n"
         f"       throwaway DB that happens not to contain 'test' in its name)\n"
     )
-from crewlayer.core.redis import get_redis
-from crewlayer.core.streaming.context_broker import ContextBroker
-from crewlayer.db.models import (
+from crewlayer.core.redis import get_redis  # noqa: E402
+from crewlayer.core.streaming.context_broker import ContextBroker  # noqa: E402
+from crewlayer.db.models import (  # noqa: E402
     ABTest,
     ABTestAssignment,
     Action,
@@ -67,8 +66,8 @@ from crewlayer.db.models import (
     WebhookDelivery,
     WebhookEndpoint,
 )
-from crewlayer.db.session import get_db
-from main import app
+from crewlayer.db.session import get_db  # noqa: E402
+from main import app  # noqa: E402
 
 # Module-level engine shared across all tests in the session.
 # NullPool prevents connection reuse across async event-loop boundaries.

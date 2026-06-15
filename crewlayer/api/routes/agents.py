@@ -6,7 +6,8 @@ from typing import Annotated, Any
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from sqlalchemy import String, cast, func, select, text, update as sa_update
+from sqlalchemy import String, cast, func, select, text
+from sqlalchemy import update as sa_update
 from sqlalchemy.dialects.postgresql import ARRAY
 
 from crewlayer.api.deps import DbDep, RedisDep, TenantDep, check_scope

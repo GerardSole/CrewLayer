@@ -55,7 +55,7 @@ class AutoJudgeResult:
 
 
 async def auto_evaluate(
-    action: "Action",
+    action: Action,
     criteria: list[str] | None = None,
 ) -> AutoJudgeResult:
     """Call claude-opus-4-8 to evaluate an action's quality on given criteria."""
@@ -104,7 +104,7 @@ async def auto_evaluate(
 
 
 async def batch_auto_evaluate(
-    db: "AsyncSession",
+    db: AsyncSession,
     tenant_id: uuid.UUID,
     agent_id: uuid.UUID,
     limit: int = 20,
