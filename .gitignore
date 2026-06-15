@@ -1,0 +1,78 @@
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+*.egg
+.eggs/
+build/
+# Python dist only — desktop/dist and dashboard/dist are excluded separately below
+dist/*.tar.gz
+dist/*.whl
+dist/*.egg
+
+.venv/
+venv/
+env/
+
+# Secrets — keep .env.example, ignore real env files
+.env
+*.env.local
+
+# ── Tests & coverage ──────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+*.cover
+
+# ── Type checking & linting ───────────────────────────────────────────────────
+.mypy_cache/
+.ruff_cache/
+
+# ── Node.js ───────────────────────────────────────────────────────────────────
+node_modules/
+desktop/node_modules/
+dashboard/node_modules/
+sdk-typescript/node_modules/
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── Build outputs ─────────────────────────────────────────────────────────────
+desktop/dist/
+desktop/out/
+dashboard/dist/
+sdk-typescript/dist/
+landing/dist/
+
+# ── IDEs & editors ────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── OS files ──────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Docker ────────────────────────────────────────────────────────────────────
+docker-compose.override.yml
+
+# ── Secrets & certificates ────────────────────────────────────────────────────
+*.pem
+*.key
+*.p12
+*.pfx
+secret_key.txt
+
+# ── SQLite (tests) ────────────────────────────────────────────────────────────
+*.db
+*.sqlite3
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+logs/
