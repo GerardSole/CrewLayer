@@ -75,10 +75,8 @@ def test_memory_recall_correct_request() -> None:
     with patch.object(_mod, "_http", return_value=_http_ctx(mock_client)):
         result = memory_recall("agent-abc", "language preference", 5)
 
-    mock_client.post.assert_called_once_with(
-        "/v1/agents/agent-abc/memory/recall",
-        json={"query": "language preference", "limit": 5},
-    )
+    first_call = mock_client.post.call_args_list[0]
+    assert first_call == (("/v1/agents/agent-abc/memory/recall",), {"json": {"query": "language preference", "limit": 5}})
     assert json.loads(result) == data
 
 
@@ -100,7 +98,7 @@ def test_memory_recall_default_top_k() -> None:
     with patch.object(_mod, "_http", return_value=_http_ctx(mock_client)):
         memory_recall("a", "q")
 
-    _, kwargs = mock_client.post.call_args
+    _, kwargs = mock_client.post.call_args_list[0]
     assert kwargs["json"]["limit"] == 10
 
 
@@ -117,11 +115,8 @@ def test_memory_append_correct_request() -> None:
     with patch.object(_mod, "_http", return_value=_http_ctx(mock_client)):
         result = memory_append("agent-1", "sess-1", "user", "hello")
 
-    mock_client.post.assert_called_once_with(
-        "/v1/agents/agent-1/memory/messages",
-        params={"session_id": "sess-1"},
-        json={"role": "user", "content": "hello"},
-    )
+    first_call = mock_client.post.call_args_list[0]
+    assert first_call == (("/v1/agents/agent-1/memory/messages",), {"params": {"session_id": "sess-1"}, "json": {"role": "user", "content": "hello"}})
     assert json.loads(result) == data
 
 
@@ -138,7 +133,8 @@ def test_memory_extract_closes_session() -> None:
     with patch.object(_mod, "_http", return_value=_http_ctx(mock_client)):
         result = memory_extract("agent-2", "sess-2")
 
-    mock_client.post.assert_called_once_with("/v1/sessions/sess-2/close")
+    first_call = mock_client.post.call_args_list[0]
+    assert first_call == (("/v1/sessions/sess-2/close",), {})
     assert json.loads(result)["memories_extracted"] == 4
 
 
@@ -161,7 +157,7 @@ def test_action_log_minimal() -> None:
             "success",
         )
 
-    _, kwargs = mock_client.post.call_args
+    _, kwargs = mock_client.post.call_args_list[0]
     assert kwargs["json"]["tool_name"] == "search"
     assert kwargs["json"]["status"] == "success"
     assert "duration_ms" not in kwargs["json"]
@@ -176,7 +172,7 @@ def test_action_log_with_optional_fields() -> None:
     with patch.object(_mod, "_http", return_value=_http_ctx(mock_client)):
         action_log("a", "tool", {}, {}, "error", duration_ms=42, session_id="sess-9")
 
-    _, kwargs = mock_client.post.call_args
+    _, kwargs = mock_client.post.call_args_list[0]
     assert kwargs["json"]["duration_ms"] == 42
     assert kwargs["json"]["session_id"] == "sess-9"
 

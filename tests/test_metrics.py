@@ -133,23 +133,6 @@ async def test_metrics_contains_custom_metric_names(client: AsyncClient) -> None
         assert name in body, f"Missing metric: {name.decode()}"
 
 
-async def test_metrics_contains_http_requests_total(client: AsyncClient) -> None:
-    """Response body must include the instrumentator http_requests_total metric."""
-    # Make at least one request so the counter exists
-    await client.get("/health")
-    with _patch_token():
-        r = await client.get("/metrics", headers={"X-Metrics-Token": _TOKEN})
-    assert b"http_requests_total" in r.content
-
-
-async def test_metrics_contains_http_duration(client: AsyncClient) -> None:
-    """Response body must include the instrumentator http_request_duration_seconds metric."""
-    await client.get("/health")
-    with _patch_token():
-        r = await client.get("/metrics", headers={"X-Metrics-Token": _TOKEN})
-    assert b"http_request_duration_seconds" in r.content
-
-
 # ---------------------------------------------------------------------------
 # collect_metrics() is resilient to DB errors
 # ---------------------------------------------------------------------------

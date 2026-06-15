@@ -470,7 +470,9 @@ async def update_agent_status(
     await db.commit()
 
     result = await db.execute(
-        select(Agent).where(Agent.id == agent_id, Agent.tenant_id == tenant.id)
+        select(Agent)
+        .where(Agent.id == agent_id, Agent.tenant_id == tenant.id)
+        .execution_options(populate_existing=True)
     )
     agent = result.scalar_one_or_none()
     if agent is None:

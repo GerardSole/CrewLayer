@@ -158,7 +158,7 @@ async def test_patch_status_working(client: AsyncClient, redis_client: object) -
     assert r.status_code == 200
     body = r.json()
     assert body["status"] == "working"
-    assert body["agent_id"] == aid
+    assert body["id"] == aid
     assert body["current_session_id"] is None
 
 
