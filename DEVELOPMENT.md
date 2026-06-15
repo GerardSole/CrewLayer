@@ -114,11 +114,14 @@ crewlayer/
 │   ├── session.py       # Async session factory
 │   └── alembic/versions/  # Alembic migrations (head: f2a3b4c5d6e7)
 mcp/                     # MCP server (FastMCP, 9 tools)
-sdk/                     # Installable Python SDK
+sdk/                     # Installable Python SDK (pip install crewlayer)
 sdk-typescript/          # TypeScript/JavaScript SDK (Node.js 18+ + browser)
+desktop/                 # Electron desktop app (bundles PostgreSQL, Redis, FastAPI)
+landing/                 # Landing page (Vercel)
+docs/                    # Documentation site (Vercel)
 observability/           # Grafana dashboard JSON
 scripts/                 # Utility scripts (seed, etc.)
-tests/                   # pytest test suite (316+ tests)
+tests/                   # pytest test suite (441 tests)
 docker-compose.yml                  # Main stack (Postgres + Redis)
 docker-compose.observability.yml    # Prometheus + Grafana
 main.py                  # FastAPI app + lifespan (background tasks)
@@ -156,7 +159,7 @@ All public endpoints live under `/v1/`. Breaking changes require a new version p
 ## Observability
 
 ```bash
-# Start Prometheus + Grafana + Jaeger
+# Start Prometheus + Grafana
 docker compose -f docker-compose.observability.yml up -d
 ```
 
@@ -183,7 +186,7 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
 OTEL_SERVICE_NAME=crewlayer
 ```
 
-Then start the observability stack (includes Jaeger):
+Jaeger is not included in `docker-compose.observability.yml` by default (which contains only Prometheus and Grafana). To enable traces, add a Jaeger service to that compose file, then start the stack:
 
 ```bash
 docker compose -f docker-compose.observability.yml up -d
@@ -251,11 +254,15 @@ The official CLI lets you manage CrewLayer resources from the terminal without w
 ### Install
 
 ```bash
-# With the CLI extras (typer + rich):
-pip install -e ".[cli]"
+# SDK base desde PyPI (v0.1.1):
+pip install crewlayer
 
-# Or from PyPI once published:
+# Con extras CLI desde PyPI:
 pip install crewlayer[cli]
+
+# O desde el monorepo (modo desarrollo):
+pip install -e ".[dev]"
+pip install -e ".[cli]"
 ```
 
 ### Setup wizard
@@ -343,6 +350,51 @@ The `docker compose build` command for the `api` service runs `npm run build` au
 - `GET /dashboard/{path:path}` — SPA catch-all returns `dashboard/dist/index.html`
 
 Hard-refreshing any dashboard route (e.g. `/dashboard/agents`) works correctly because of this fallback.
+
+## Desktop App
+
+The Electron desktop app lives in `desktop/`. It bundles PostgreSQL, Redis, and the FastAPI backend into a single executable — no Docker required.
+
+### Development
+
+```bash
+cd desktop
+npm install
+npm run dev       # starts Electron with hot-reload; expects FastAPI on localhost:8000
+```
+
+### Build (production executables)
+
+```bash
+cd desktop
+npm run build     # generates platform-specific executables in desktop/dist/
+```
+
+Electron Builder packages the app for the current platform. To cross-compile, configure targets in `desktop/electron-builder.yml`.
+
+## Landing
+
+The marketing landing page lives in `landing/`. It is a static site deployed to Vercel. No build step is required.
+
+### Development
+
+```bash
+cd landing
+npx serve .       # or open index.html directly in a browser
+```
+
+`download.html` contains platform-specific download buttons that link to GitHub Releases assets.
+
+## Docs
+
+The reference documentation lives in `docs/`. It is deployed to Vercel alongside the landing page. No build step is required.
+
+### Development
+
+```bash
+cd docs
+npx serve .       # or open index.html directly in a browser
+```
 
 ## TypeScript SDK
 

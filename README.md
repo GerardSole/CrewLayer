@@ -215,12 +215,40 @@ npm run dev      # http://localhost:5173  — proxies /v1/* to localhost:8000
 
 ---
 
+## Desktop App
+
+CrewLayer ships a native desktop application for macOS, Windows, and Linux. It bundles the full backend — PostgreSQL, Redis, and FastAPI — into a single executable: no Docker, no manual setup.
+
+**Download:** [GitHub Releases](https://github.com/GerardSole/CrewLayer/releases/latest) — latest: **v0.1.0-desktop**
+
+The Electron app lives in `desktop/`. On first launch it initialises the embedded database, runs migrations automatically, and opens the dashboard in the app window. For server deployments or team use, the Docker Compose path is the recommended option.
+
+---
+
+## Landing & Docs
+
+- **Landing page** (`landing/`) — marketing site deployed to Vercel. Includes a `download.html` page with platform-specific download buttons that link to GitHub Releases assets.
+- **Documentation** (`docs/`) — reference docs deployed to Vercel alongside the landing page.
+
+---
+
+## Releases
+
+| Release | Tag | Contents |
+|---|---|---|
+| Backend v0.1.0 | `v0.1.0` | First stable API release — all endpoints, SDKs, CLI, MCP server, dashboard |
+| Desktop v0.1.0 | `v0.1.0-desktop` | Electron app for macOS, Windows, and Linux |
+
+The Python SDK is published on PyPI as [`crewlayer`](https://pypi.org/project/crewlayer/) — current version **v0.1.1**.
+
+---
+
 ## SDKs
 
 ### Python
 
 ```bash
-pip install ./sdk
+pip install crewlayer          # PyPI — latest: v0.1.1
 ```
 
 ```python
@@ -312,6 +340,7 @@ stream.close(); // when done
 | `DELETE` | `/v1/agents/{id}` | Delete agent |
 | `GET` | `/v1/agents/{id}/status` | Get status (Redis-cached) |
 | `PATCH` | `/v1/agents/{id}/status` | Set status (idle/working/error) |
+| `GET` | `/v1/agents/{id}/status/history` | Status change history (cursor-paginated) |
 | `GET` | `/v1/agents/tags` | List all tags with usage counts |
 | `POST` | `/v1/agents/{id}/tags` | Add tags |
 | `DELETE` | `/v1/agents/{id}/tags/{tag}` | Remove a tag |
@@ -614,7 +643,7 @@ pip install -e ".[dev]"
 pytest tests/ -v
 ```
 
-316 Python tests run against a real PostgreSQL and Redis instance (no mocks for infrastructure). CLI tests use httpx mocks and require no running server. TypeScript SDK: 72 tests with vitest (fetch mocked, no server needed).
+441 Python tests run against a real PostgreSQL and Redis instance (no mocks for infrastructure). CLI tests use httpx mocks and require no running server. TypeScript SDK: 72 tests with vitest (fetch mocked, no server needed).
 
 ---
 

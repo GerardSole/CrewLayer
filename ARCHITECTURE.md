@@ -5,6 +5,13 @@
 CrewLayer is a stateless FastAPI application backed by PostgreSQL (via pgvector) and Redis. All persistent state lives in Postgres; Redis handles short-term session memory, embedding caches, and pub/sub for real-time SSE streams.
 
 ```
+  landing/ (Vercel)   docs/ (Vercel)
+
+Electron Desktop App (desktop/)
+  ├── PostgreSQL (embedded)
+  ├── Redis (embedded)
+  └── FastAPI + Dashboard (embedded)    ← self-contained; same API surface as below
+
 Claude Desktop / Claude Code
         │ stdio or SSE
         ▼
@@ -26,7 +33,7 @@ Python SDK (sdk/)  TypeScript SDK (sdk-typescript/)  CLI (crewlayer cli)
         │  ┌────────┬──────────┬──────────┬────────┬─────────────┐   │
         │  │  auth  │  agents  │  memory  │actions │   context   │   │
         │  │  audit │ sessions │ webhooks │ usage  │   metrics   │   │
-        │  │        │ episodes │          │ alerts │             │   │
+        │  │prompts │ episodes │          │ alerts │ evaluations │   │
         │  └────┬───┴────┬─────┴─────┬────┴───┬────┴────┬────────┘   │
         └───────┼────────┼───────────┼────────┼─────────┼────────────┘
                 │        │           │        │         │
@@ -239,6 +246,8 @@ tenants
                             status enum; winner enum nullable)
        └── ab_test_assignments (ab_test_id FK; session_id FK; variant enum A/B;
                                 unique on ab_test_id + session_id)
+       └── agent_status_history (agent_id FK; old_status enum; new_status enum;
+                                 changed_at TIMESTAMPTZ; source text)
   └── episode_memories    (composite PK: episode_id + memory_id; join table)
   └── agent_relations     (supervisor_id, subordinate_id, relation_type enum; unique per pair)
   └── context_entries     (unique on tenant+namespace+key; expires_at; written_by)
@@ -311,7 +320,7 @@ Six custom Gauges refreshed every 60 s:
 
 #### Python SDK (`sdk/`)
 
-Installable as `pip install ./sdk`. Provides:
+Installable as `pip install crewlayer` (PyPI v0.1.1) or `pip install ./sdk` from source. Provides:
 - `CrewLayerClient` (sync) and `AsyncCrewLayerClient` (async) backed by `httpx`
 - Retry with exponential backoff (3 retries, 1 s/2 s/4 s) on 5xx and transport errors
 - Typed exceptions: `AuthError`, `NotFoundError`, `ConflictError`, `RateLimitError`, `ServerError`
@@ -328,7 +337,7 @@ Installable as `npm install crewlayer` (or local `npm install ./sdk-typescript`)
 
 ### Dashboard (`dashboard/`)
 
-Web interface built with **React 18**, **React Router v6**, **TanStack Query v5**, **Recharts**, and **Radix UI / shadcn-ui** primitives. Styled with Tailwind CSS.
+Web interface built with **React 18**, **React Router v6**, **TanStack Query v5**, **Recharts**, and **Radix UI / shadcn-ui** primitives. Styled with Tailwind CSS, **Outfit** typeface, and a neutral grey palette.
 
 **Pages:**
 
@@ -360,6 +369,25 @@ In development (`npm run dev`), Vite runs on `localhost:5173` and proxies `/v1/*
 Installable as `pip install crewlayer[cli]` (typer + rich). Entry point: `crewlayer.cli.main:app`. Config stored at `~/.crewlayer/config.json` (chmod 0o600).
 
 Sub-commands: `init`, `config`, `tenants create`, `keys create/list`, `agents list/create/status`, `memory recall/list`, `actions list/stats`, `export`, `import`. Every list/detail command supports `--json` for pipeline use (pipes into `jq`, CI scripts, etc.).
+
+### Desktop App (`desktop/`)
+
+A native Electron application that bundles the entire CrewLayer backend — PostgreSQL, Redis, and FastAPI — into a single downloadable executable. Targets macOS, Windows, and Linux.
+
+**Startup flow:**
+1. Electron main process starts embedded PostgreSQL and Redis if not already running.
+2. Runs `alembic upgrade head` against the embedded database.
+3. Spawns the FastAPI server on `localhost:8000`.
+4. Opens a `BrowserWindow` pointing at `http://localhost:8000/dashboard`.
+
+No Docker or external infrastructure is required. Embedded services stop when the Electron window closes. Download from [GitHub Releases](https://github.com/GerardSole/CrewLayer/releases) (tag `v0.1.0-desktop`).
+
+### Landing & Docs
+
+- **`landing/`** — static marketing site deployed to Vercel. Includes a `download.html` page with platform-specific download buttons linking to GitHub Releases assets.
+- **`docs/`** — reference documentation site deployed to Vercel alongside the landing page.
+
+Both are independent of the FastAPI backend and have no Python dependencies.
 
 ## Data flow: memory recall
 
