@@ -5,11 +5,36 @@ const {
   nativeImage, ipcMain, dialog, shell, clipboard, Notification,
 } = require('electron');
 const { autoUpdater } = require('electron-updater');
+const log   = require('electron-log');
 const path  = require('path');
 const fs    = require('fs');
-const { spawn } = require('child_process');
+const cp    = require('child_process');
 const http  = require('http');
 const crypto = require('crypto');
+
+// ── Logging ────────────────────────────────────────────────────────────────
+
+log.transports.file.resolvePathFn = () =>
+  path.join(app.getPath('logs'), 'main.log');
+log.transports.file.level = 'debug';
+log.transports.console.level = 'debug';
+log.info('CrewLayer starting', { version: app.getVersion(), platform: process.platform });
+
+// embedded-postgres stores its binaries in app.asar.unpacked but constructs
+// spawn paths using require.resolve() which returns the asar virtual path.
+// child_process.spawn doesn't go through Electron's virtual FS, so we patch
+// it here to redirect app.asar/* → app.asar.unpacked/* for binary paths.
+if (app.isPackaged) {
+  const _spawn = cp.spawn;
+  cp.spawn = function patchedSpawn(cmd, args, opts) {
+    if (typeof cmd === 'string' && /app\.asar[/\\]/.test(cmd)) {
+      cmd = cmd.replace(/(app\.asar)([/\\])/g, '$1.unpacked$2');
+    }
+    return _spawn.call(this, cmd, args, opts);
+  };
+}
+
+const { spawn } = cp;
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -110,6 +135,12 @@ function createSplashWindow() {
   splashWin.loadFile(path.join(rendererDir, 'index.html'));
 }
 
+function loadDashboard() {
+  const url = `http://localhost:${settings.apiPort}/dashboard`;
+  log.info('Loading dashboard BrowserView', { url });
+  dashView.webContents.loadURL(url);
+}
+
 function createMainWindow() {
   const isMac = process.platform === 'darwin';
   mainWin = new BrowserWindow({
@@ -123,17 +154,31 @@ function createMainWindow() {
   });
   mainWin.loadFile(path.join(rendererDir, 'app.html'));
 
-  // BrowserView hosts the FastAPI dashboard
-  dashView = new BrowserView({ webPreferences: { contextIsolation: true } });
-  mainWin.addBrowserView(dashView);
-  resizeDash();
-  dashView.webContents.loadURL(`http://localhost:${settings.apiPort}/dashboard`);
-
   mainWin.on('resize', resizeDash);
   mainWin.on('close', e => {
     if (!isQuitting) { e.preventDefault(); mainWin.hide(); }
   });
-  mainWin.once('ready-to-show', () => mainWin.show());
+
+  // Create BrowserView inside ready-to-show so getContentSize() is reliable
+  // and the toolbar HTML has already rendered before we attach the view.
+  mainWin.once('ready-to-show', () => {
+    dashView = new BrowserView({ webPreferences: { contextIsolation: true } });
+    mainWin.addBrowserView(dashView);
+    resizeDash();
+
+    dashView.webContents.on('did-fail-load', (_e, code, desc, url) => {
+      log.warn('Dashboard load failed — retrying in 3 s', { code, desc, url });
+      setTimeout(() => {
+        if (dashView && !dashView.webContents.isDestroyed()) loadDashboard();
+      }, 3000);
+    });
+    dashView.webContents.on('did-finish-load', () =>
+      log.info('Dashboard loaded', { url: `http://localhost:${settings.apiPort}/dashboard` }),
+    );
+
+    loadDashboard();
+    mainWin.show();
+  });
 }
 
 function resizeDash() {
@@ -210,7 +255,8 @@ function startHealthMonitor() {
 // ── Services ───────────────────────────────────────────────────────────────
 
 async function startPostgres() {
-  const { EmbeddedPostgres } = require('embedded-postgres');
+  log.info('Starting PostgreSQL...', { port: PG_PORT, dataDir: pgDataDir });
+  const { default: EmbeddedPostgres } = await import('embedded-postgres');
   fs.mkdirSync(pgDataDir, { recursive: true });
   pgInstance = new EmbeddedPostgres({
     databaseDir: pgDataDir,
@@ -219,16 +265,27 @@ async function startPostgres() {
     port: PG_PORT,
     persistent: true,
   });
-  await pgInstance.initialise();
+  if (!fs.existsSync(path.join(pgDataDir, 'PG_VERSION'))) {
+    log.info('Initialising PostgreSQL cluster...');
+    await pgInstance.initialise();
+  } else {
+    log.info('PostgreSQL cluster already initialised — skipping initdb');
+  }
   await pgInstance.start();
   try { await pgInstance.createDatabase('crewlayer'); } catch (_) { /* already exists */ }
   svcStatus.postgres = true;
+  log.info('PostgreSQL ready', { port: PG_PORT });
 }
 
 async function startRedis() {
   const bin = redisBin();
+  log.info('Starting Redis...', { port: REDIS_PORT, bin });
   if (!fs.existsSync(bin)) {
-    if (!app.isPackaged) { svcStatus.redis = true; return; }
+    if (!app.isPackaged) {
+      log.warn('Redis binary not found — dev mode, assuming external Redis');
+      svcStatus.redis = true;
+      return;
+    }
     throw new Error(`Redis binary not found at:\n${bin}\n\nRun: npm run download-redis`);
   }
   if (process.platform !== 'win32') fs.chmodSync(bin, 0o755);
@@ -243,7 +300,14 @@ async function startRedis() {
     ], { stdio: 'pipe' });
 
     let resolved = false;
-    const ok = () => { if (!resolved) { resolved = true; svcStatus.redis = true; resolve(); } };
+    const ok = () => {
+      if (!resolved) {
+        resolved = true;
+        svcStatus.redis = true;
+        log.info('Redis ready', { port: REDIS_PORT });
+        resolve();
+      }
+    };
 
     redisProc.stdout.on('data', d => { if (d.toString().includes('Ready to accept')) ok(); });
     redisProc.on('error', e => { if (!resolved) { resolved = true; reject(e); } });
@@ -252,13 +316,17 @@ async function startRedis() {
 }
 
 async function startBackend() {
+  log.info('Starting backend...', { port: settings.apiPort });
   if (!app.isPackaged) {
-    // Dev mode: assume the Python server is started separately
+    log.info('Dev mode — assuming external backend on port', settings.apiPort);
     svcStatus.api = await ping(settings.apiPort);
-    return;
+    return true;
   }
   const bin = backendBin();
-  if (!fs.existsSync(bin)) throw new Error(`Backend binary not found at:\n${bin}\n\nRun: npm run build-backend`);
+  if (!fs.existsSync(bin)) {
+    log.warn('Backend binary not found — opening app without API', { bin });
+    return false; // non-fatal: app opens with API shown as offline
+  }
   if (process.platform !== 'win32') fs.chmodSync(bin, 0o755);
 
   const env = {
@@ -271,9 +339,13 @@ async function startBackend() {
     CREWLAYER_DATA_DIR: dataDir,
   };
   backendProc = spawn(bin, [], { env, stdio: 'pipe' });
+  backendProc.stdout.on('data', d => log.debug('[backend]', d.toString().trimEnd()));
+  backendProc.stderr.on('data', d => log.warn('[backend]',  d.toString().trimEnd()));
   backendProc.on('exit', code => {
+    log.warn('Backend process exited', { code });
     if (!isQuitting && code !== 0) { svcStatus.api = false; broadcastStatus(); }
   });
+  return true;
 }
 
 function ping(port) {
@@ -322,18 +394,27 @@ async function startup() {
     progress('Redis ready', 50, 'redis');
 
     progress('Starting CrewLayer API…', 55, 'backend');
-    await startBackend();
-    progress('Waiting for API to be ready…', 65, 'backend');
+    const backendLaunched = await startBackend();
 
-    let pct = 65;
-    const t0 = Date.now();
-    while (!(await ping(settings.apiPort))) {
-      if (Date.now() - t0 > 60000) throw new Error('API did not start within 60 seconds.');
-      pct = Math.min(pct + 0.4, 94);
-      progress('Waiting for API to be ready…', pct, 'backend');
-      await new Promise(r => setTimeout(r, 500));
+    if (backendLaunched) {
+      progress('Waiting for API to be ready…', 65, 'backend');
+      log.info('Waiting for backend to be healthy...', { port: settings.apiPort });
+      let pct = 65;
+      const t0 = Date.now();
+      while (!(await ping(settings.apiPort))) {
+        if (Date.now() - t0 > 60000) throw new Error('API did not start within 60 seconds.');
+        pct = Math.min(pct + 0.4, 94);
+        progress('Waiting for API to be ready…', pct, 'backend');
+        await new Promise(r => setTimeout(r, 500));
+      }
+      svcStatus.api = true;
+      log.info('Backend healthy', { port: settings.apiPort, elapsed: `${Date.now() - t0}ms` });
+    } else {
+      log.warn('Backend not launched — app will open with API offline');
+      progress('API offline — build backend to enable', 90, 'backend');
+      await new Promise(r => setTimeout(r, 800));
     }
-    svcStatus.api = true;
+
     progress('CrewLayer is ready!', 100, 'done');
     await new Promise(r => setTimeout(r, 700));
 
@@ -350,6 +431,7 @@ async function startup() {
     if (app.isPackaged) autoUpdater.checkForUpdatesAndNotify();
 
   } catch (err) {
+    log.error('Startup failed', err);
     dialog.showErrorBox('CrewLayer failed to start', err.message);
     app.quit();
   }
@@ -378,6 +460,10 @@ ipcMain.handle('check-updates',    ()        => { if (app.isPackaged) autoUpdate
 
 ipcMain.handle('close-window', e => {
   BrowserWindow.fromWebContents(e.sender)?.close();
+});
+
+ipcMain.handle('reload-dashboard', () => {
+  if (dashView && !dashView.webContents.isDestroyed()) loadDashboard();
 });
 
 ipcMain.handle('open-dashboard', () => {

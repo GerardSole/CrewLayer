@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld('cl', {
   openExternal:    (url) => invoke('open-external', url),
   openSettings:    ()    => invoke('open-settings'),
   openDashboard:   ()    => invoke('open-dashboard'),
+  reloadDashboard: ()    => invoke('reload-dashboard'),
   minimizeToTray:  ()    => invoke('minimize-to-tray'),
   closeWindow:     ()    => invoke('close-window'),
 

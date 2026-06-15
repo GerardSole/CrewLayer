@@ -121,7 +121,14 @@ async function downloadPlatform(platform) {
       fs.chmodSync(outFile, 0o755);
     }
   } else if (src.archive.endsWith('.zip')) {
-    execSync(`unzip -o "${archive}" -d "${tmpDir}"`, { stdio: 'pipe' });
+    if (process.platform === 'win32') {
+      execSync(
+        `powershell -NoProfile -Command "Expand-Archive -LiteralPath '${archive}' -DestinationPath '${tmpDir}' -Force"`,
+        { stdio: 'pipe' },
+      );
+    } else {
+      execSync(`unzip -o "${archive}" -d "${tmpDir}"`, { stdio: 'pipe' });
+    }
     const bin = path.join(tmpDir, src.binPath);
     fs.copyFileSync(bin, outFile);
   }

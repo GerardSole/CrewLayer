@@ -2,20 +2,26 @@
   "name": "crewlayer-desktop",
   "version": "1.0.0",
   "description": "CrewLayer Desktop — AI agent backend bundled as a native app",
+  "type": "commonjs",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
+    "prebuild": "node scripts/download-redis.js",
     "build": "electron-builder --publish never",
-    "build:mac": "electron-builder --mac --publish never",
+    "prebuild:win": "node scripts/download-redis.js --platform=win-x64",
     "build:win": "electron-builder --win --publish never",
+    "prebuild:mac": "node scripts/download-redis.js --platform=mac-arm64 && node scripts/download-redis.js --platform=mac-x64",
+    "build:mac": "electron-builder --mac --publish never",
+    "prebuild:linux": "node scripts/download-redis.js --platform=linux-x64",
     "build:linux": "electron-builder --linux --publish never",
     "download-redis": "node scripts/download-redis.js",
     "build-backend": "bash scripts/build-backend.sh",
     "release": "electron-builder --publish always"
   },
   "dependencies": {
-    "embedded-postgres": "^17.4.0",
-    "electron-updater": "^6.3.9"
+    "electron-log": "^5.4.4",
+    "electron-updater": "^6.3.9",
+    "embedded-postgres": "18.4.0-beta.17"
   },
   "devDependencies": {
     "electron": "^28.3.3",
