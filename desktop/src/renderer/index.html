@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Starting CrewLayer…</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; height: 100%;
+      background: transparent;
+      font-family: 'Outfit', sans-serif;
+      -webkit-font-smoothing: antialiased;
+      overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .card {
+      width: 420px;
+      background: #111111;
+      border: 1px solid #1e1e1e;
+      border-radius: 16px;
+      padding: 40px 36px;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.85);
+      -webkit-app-region: drag;
+    }
+    .logo {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 28px;
+    }
+    .logo-text {
+      font-size: 18px; font-weight: 700; letter-spacing: -0.03em; color: #f5f5f5;
+    }
+    .headline {
+      font-size: 15px; font-weight: 600; color: #f5f5f5; margin-bottom: 6px;
+    }
+    .sub {
+      font-size: 13px; color: #666; margin-bottom: 28px;
+      min-height: 20px; transition: color .3s;
+    }
+    .progress-track {
+      width: 100%; height: 4px;
+      background: #1a1a1a; border-radius: 2px; overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%; border-radius: 2px;
+      background: #22c55e;
+      width: 0%; transition: width .4s cubic-bezier(.4,0,.2,1);
+      box-shadow: 0 0 8px rgba(34,197,94,.6);
+    }
+    .steps {
+      margin-top: 22px; display: flex; flex-direction: column; gap: 7px;
+    }
+    .step {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 12.5px; color: #444;
+      transition: color .3s;
+    }
+    .step.active { color: #888; }
+    .step.done   { color: #22c55e; }
+    .step-icon { width: 14px; height: 14px; flex-shrink: 0; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+      <rect x="3" y="15" width="18" height="4" rx="2" fill="#22c55e" opacity="0.95"/>
+      <rect x="3" y="10" width="18" height="4" rx="2" fill="#22c55e" opacity="0.6"/>
+      <rect x="3" y="5"  width="18" height="4" rx="2" fill="#22c55e" opacity="0.28"/>
+    </svg>
+    <span class="logo-text">CrewLayer</span>
+  </div>
+
+  <p class="headline">Starting services…</p>
+  <p class="sub" id="statusMsg">Initializing…</p>
+
+  <div class="progress-track">
+    <div class="progress-fill" id="progressFill"></div>
+  </div>
+
+  <div class="steps">
+    <div class="step" id="step-postgres">
+      <svg class="step-icon" viewBox="0 0 14 14" fill="none">
+        <circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1.2"/>
+      </svg>
+      PostgreSQL
+    </div>
+    <div class="step" id="step-redis">
+      <svg class="step-icon" viewBox="0 0 14 14" fill="none">
+        <circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1.2"/>
+      </svg>
+      Redis
+    </div>
+    <div class="step" id="step-backend">
+      <svg class="step-icon" viewBox="0 0 14 14" fill="none">
+        <circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1.2"/>
+      </svg>
+      CrewLayer API
+    </div>
+  </div>
+</div>
+
+<script>
+  const fill = document.getElementById('progressFill');
+  const msg  = document.getElementById('statusMsg');
+  const steps = {
+    postgres: document.getElementById('step-postgres'),
+    redis:    document.getElementById('step-redis'),
+    backend:  document.getElementById('step-backend'),
+  };
+
+  const checkSVG = `<svg class="step-icon" viewBox="0 0 14 14" fill="none">
+    <circle cx="7" cy="7" r="6" fill="rgba(34,197,94,.15)" stroke="#22c55e" stroke-width="1.2"/>
+    <path d="M4.5 7l2 2 3-3" stroke="#22c55e" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+
+  const spinSVG = `<svg class="step-icon" viewBox="0 0 14 14" fill="none" style="animation:spin .8s linear infinite">
+    <circle cx="7" cy="7" r="5.5" stroke="#444" stroke-width="1.2"/>
+    <path d="M7 1.5A5.5 5.5 0 0 1 12.5 7" stroke="#22c55e" stroke-width="1.4" stroke-linecap="round"/>
+  </svg>`;
+
+  const style = document.createElement('style');
+  style.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
+  document.head.appendChild(style);
+
+  const unsub = window.cl.onProgress(({ message, percent, step }) => {
+    msg.textContent = message;
+    fill.style.width = percent + '%';
+
+    // Mark steps
+    if (step === 'redis' || step === 'backend' || step === 'done') {
+      steps.postgres.innerHTML = checkSVG + ' PostgreSQL';
+      steps.postgres.className = 'step done';
+    }
+    if (step === 'backend' || step === 'done') {
+      steps.redis.innerHTML = checkSVG + ' Redis';
+      steps.redis.className = 'step done';
+    }
+    if (step === 'done') {
+      steps.backend.innerHTML = checkSVG + ' CrewLayer API';
+      steps.backend.className = 'step done';
+    } else if (step === 'backend') {
+      steps.backend.innerHTML = spinSVG + ' CrewLayer API';
+      steps.backend.className = 'step active';
+    } else if (step === 'redis') {
+      steps.redis.innerHTML = spinSVG + ' Redis';
+      steps.redis.className = 'step active';
+    } else if (step === 'postgres') {
+      steps.postgres.innerHTML = spinSVG + ' PostgreSQL';
+      steps.postgres.className = 'step active';
+    }
+
+    if (percent >= 100) unsub();
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+{
+  "name": "crewlayer-desktop",
+  "version": "1.0.0",
+  "description": "CrewLayer Desktop — AI agent backend bundled as a native app",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --publish never",
+    "build:mac": "electron-builder --mac --publish never",
+    "build:win": "electron-builder --win --publish never",
+    "build:linux": "electron-builder --linux --publish never",
+    "download-redis": "node scripts/download-redis.js",
+    "build-backend": "bash scripts/build-backend.sh",
+    "release": "electron-builder --publish always"
+  },
+  "dependencies": {
+    "embedded-postgres": "^17.4.0",
+    "electron-updater": "^6.3.9"
+  },
+  "devDependencies": {
+    "electron": "^28.3.3",
+    "electron-builder": "^24.13.3"
+  }
+}
