@@ -166,6 +166,32 @@
       white-space: pre; overflow-x: auto;
     }
 
+    /* ── Coming soon ───────────────────── */
+    .badge-soon {
+      display: inline-flex; align-items: center; gap: 7px;
+      background: rgba(255,255,255,.05); color: var(--muted);
+      font-size: 13px; font-weight: 600; padding: 10px 22px;
+      border-radius: 8px; border: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .docker-hint {
+      background: #0c0c0c; border: 1px solid var(--border);
+      border-radius: 10px; padding: 18px 22px;
+      margin-top: -8px; margin-bottom: 8px; text-align: left;
+    }
+    .docker-hint p { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+    .docker-hint pre {
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      font-size: 12.5px; color: #a8c0d8;
+      overflow-x: auto; line-height: 1.7;
+    }
+    .dl-alt-soon {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 10px; padding: 16px;
+      display: flex; align-items: center; gap: 12px;
+      opacity: 0.45; cursor: default; user-select: none;
+    }
+
     /* ── Footer ────────────────────────── */
     footer {
       border-top: 1px solid var(--border);
@@ -213,54 +239,70 @@
           <p class="dl-title" id="dlTitle">Loading…</p>
           <p class="dl-subtitle" id="dlSubtitle"></p>
         </div>
-        <a class="btn-dl" id="dlBtn" href="#">
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-            <path d="M8 2v9M5 8l3 3 3-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M2 13h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-          </svg>
-          Download
-        </a>
+        <div id="dlAction">
+          <a class="btn-dl" id="dlBtn" href="#">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <path d="M8 2v9M5 8l3 3 3-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M2 13h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            </svg>
+            Download
+          </a>
+        </div>
+      </div>
+
+      <!-- Docker alternative shown for Mac/Linux (hidden by default) -->
+      <div class="docker-hint" id="dockerHint" style="display:none">
+        <p>🐳 <strong style="color:var(--text)">Use Docker in the meantime:</strong></p>
+        <pre>git clone https://github.com/GerardSole/CrewLayer
+cd CrewLayer && cp .env.example .env
+# Add your ANTHROPIC_API_KEY to .env
+docker compose up -d
+
+# API        → http://localhost:8000
+# Dashboard  → http://localhost:8000/dashboard</pre>
       </div>
     </section>
 
     <!-- Alternative platforms -->
     <h2>All platforms</h2>
     <div class="dl-grid">
-      <a class="dl-alt" href="https://github.com/GerardSole/CrewLayer/releases/latest/download/CrewLayer-universal.dmg">
-        <span class="dl-alt-icon"> </span>
+      <!-- macOS — coming soon -->
+      <div class="dl-alt-soon">
+        <span class="dl-alt-icon">🍎</span>
         <div class="dl-alt-info">
-          <p class="dl-alt-name">macOS (Intel + Apple Silicon)</p>
-          <p class="dl-alt-desc">.dmg installer · Universal</p>
+          <p class="dl-alt-name">macOS</p>
+          <p class="dl-alt-desc">Coming soon · use Docker</p>
         </div>
-      </a>
-      <a class="dl-alt" href="https://github.com/GerardSole/CrewLayer/releases/latest/download/CrewLayer-Setup-x64.exe">
+      </div>
+
+      <!-- Windows installer -->
+      <a class="dl-alt" href="https://github.com/GerardSole/CrewLayer/releases/download/v0.1.0-desktop/CrewLayer.Setup.1.0.0.exe">
         <span class="dl-alt-icon">🪟</span>
         <div class="dl-alt-info">
           <p class="dl-alt-name">Windows x64</p>
           <p class="dl-alt-desc">.exe NSIS installer</p>
         </div>
       </a>
-      <a class="dl-alt" href="https://github.com/GerardSole/CrewLayer/releases/latest/download/CrewLayer-Portable-x64.exe">
+
+      <!-- Windows portable -->
+      <a class="dl-alt" href="https://github.com/GerardSole/CrewLayer/releases/download/v0.1.0-desktop/CrewLayer.1.0.0.exe">
         <span class="dl-alt-icon">🪟</span>
         <div class="dl-alt-info">
           <p class="dl-alt-name">Windows x64 Portable</p>
           <p class="dl-alt-desc">No install required</p>
         </div>
       </a>
-      <a class="dl-alt" href="https://github.com/GerardSole/CrewLayer/releases/latest/download/CrewLayer-x86_64.AppImage">
+
+      <!-- Linux — coming soon -->
+      <div class="dl-alt-soon">
         <span class="dl-alt-icon">🐧</span>
         <div class="dl-alt-info">
-          <p class="dl-alt-name">Linux x64</p>
-          <p class="dl-alt-desc">.AppImage · No install</p>
+          <p class="dl-alt-name">Linux</p>
+          <p class="dl-alt-desc">Coming soon · use Docker</p>
         </div>
-      </a>
-      <a class="dl-alt" href="https://github.com/GerardSole/CrewLayer/releases/latest/download/CrewLayer-amd64.deb">
-        <span class="dl-alt-icon">🐧</span>
-        <div class="dl-alt-info">
-          <p class="dl-alt-name">Linux x64 (Debian/Ubuntu)</p>
-          <p class="dl-alt-desc">.deb package</p>
-        </div>
-      </a>
+      </div>
+
+      <!-- All releases -->
       <a class="dl-alt" href="https://github.com/GerardSole/CrewLayer/releases">
         <span class="dl-alt-icon">📦</span>
         <div class="dl-alt-info">
@@ -335,52 +377,62 @@ docker compose up -d
 </footer>
 
 <script>
-  // Auto-detect OS and show the best download button
   function detectOS() {
     const ua = navigator.userAgent;
-    if (/Mac/i.test(ua) && !/iPhone|iPad/.test(ua)) return 'mac';
-    if (/Win/i.test(ua)) return 'win';
-    return 'linux';
+    const pl = navigator.platform || '';
+    if (/^Win/.test(pl) || /Windows/.test(ua))               return 'win';
+    if (/^Mac/.test(pl) && !/iPhone|iPad|iPod/.test(ua))     return 'mac';
+    if (/Mac/i.test(ua) && !/iPhone|iPad|iPod/.test(ua))     return 'mac';
+    if (/Linux/.test(pl) || /Linux/.test(ua))                 return 'linux';
+    return 'win'; // safe fallback — Windows is the only available binary
   }
 
   const PLATFORMS = {
-    mac: {
-      icon: ' ',
-      title: 'Download for macOS',
-      subtitle: 'Universal binary — Intel + Apple Silicon · macOS 12+',
-      url: 'https://github.com/GerardSole/CrewLayer/releases/latest/download/CrewLayer-universal.dmg',
-      btn: 'Download .dmg',
-    },
     win: {
+      type: 'download',
       icon: '🪟',
       title: 'Download for Windows',
-      subtitle: 'Windows 10/11 · 64-bit installer',
-      url: 'https://github.com/GerardSole/CrewLayer/releases/latest/download/CrewLayer-Setup-x64.exe',
-      btn: 'Download .exe',
+      subtitle: 'Windows 10/11 · 64-bit · NSIS installer',
+      url:  'https://github.com/GerardSole/CrewLayer/releases/download/v0.1.0-desktop/CrewLayer.Setup.1.0.0.exe',
+      btn:  'Download .exe',
+      altUrl: 'https://github.com/GerardSole/CrewLayer/releases/download/v0.1.0-desktop/CrewLayer.1.0.0.exe',
+    },
+    mac: {
+      type: 'soon',
+      icon: '🍎',
+      title: 'macOS — Coming soon',
+      subtitle: 'Use Docker in the meantime (see below)',
     },
     linux: {
+      type: 'soon',
       icon: '🐧',
-      title: 'Download for Linux',
-      subtitle: 'x86_64 · AppImage (no install required)',
-      url: 'https://github.com/GerardSole/CrewLayer/releases/latest/download/CrewLayer-x86_64.AppImage',
-      btn: 'Download .AppImage',
+      title: 'Linux — Coming soon',
+      subtitle: 'Use Docker in the meantime (see below)',
     },
   };
 
   const os = detectOS();
   const p  = PLATFORMS[os];
 
-  document.getElementById('osIcon').textContent    = p.icon;
-  document.getElementById('dlTitle').textContent   = p.title;
+  document.getElementById('osIcon').textContent     = p.icon;
+  document.getElementById('dlTitle').textContent    = p.title;
   document.getElementById('dlSubtitle').textContent = p.subtitle;
-  const btn = document.getElementById('dlBtn');
-  btn.href = p.url;
-  btn.innerHTML = `
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-      <path d="M8 2v9M5 8l3 3 3-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="M2 13h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-    </svg>
-    ${p.btn}`;
+
+  if (p.type === 'download') {
+    const btn = document.getElementById('dlBtn');
+    btn.href = p.url;
+    btn.innerHTML = `
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+        <path d="M8 2v9M5 8l3 3 3-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M2 13h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+      </svg>
+      ${p.btn}`;
+  } else {
+    // Coming soon — replace button with badge, show docker hint
+    document.getElementById('dlAction').innerHTML =
+      '<span class="badge-soon">Coming soon</span>';
+    document.getElementById('dockerHint').style.display = 'block';
+  }
 </script>
 </body>
 </html>
