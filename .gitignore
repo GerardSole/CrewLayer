@@ -77,3 +77,4 @@ secret_key.txt
 *.log
 logs/
 CLtmpcli_core.txt
+Ctmpcli_core.txt
