@@ -136,11 +136,11 @@ async def batch_auto_evaluate(
             Action.agent_id == agent_id,
             Action.id.not_in(already_auto),
         )
-        .order_by(Action.created_at.desc())
+        .order_by(Action.created_at.desc())  # type: ignore[attr-defined]
         .limit(limit)
     )
     if since is not None:
-        stmt = stmt.where(Action.created_at >= since)
+        stmt = stmt.where(Action.created_at >= since)  # type: ignore[attr-defined]
 
     actions = (await db.execute(stmt)).scalars().all()
     count = 0

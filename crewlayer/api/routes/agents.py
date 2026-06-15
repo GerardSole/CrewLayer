@@ -458,7 +458,7 @@ async def update_agent_status(
         )
         .execution_options(synchronize_session=False)
     )
-    if upd.rowcount == 0:
+    if upd.rowcount == 0:  # type: ignore[attr-defined]
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agente no encontrado")
 
     db.add(AgentStatusHistory(
@@ -505,7 +505,7 @@ async def get_agent_status_history(
         .order_by(AgentStatusHistory.timestamp.desc())
         .limit(limit)
     )
-    return list(result.scalars().all())
+    return [StatusHistoryEntry.model_validate(r) for r in result.scalars().all()]
 
 
 # ---------------------------------------------------------------------------

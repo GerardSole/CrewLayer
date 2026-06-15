@@ -248,7 +248,7 @@ async def auto_evaluate_batch(
         )
     )
     if since:
-        pending_stmt = pending_stmt.where(Action.created_at >= since)
+        pending_stmt = pending_stmt.where(Action.created_at >= since)  # type: ignore[attr-defined]
 
     actions_pending = int((await db.execute(pending_stmt)).scalar_one() or 0)
     capped = min(actions_pending, body.limit)

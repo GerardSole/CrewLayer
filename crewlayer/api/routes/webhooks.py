@@ -3,6 +3,7 @@ import hmac
 import json
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 
 import httpx
 from fastapi import APIRouter, HTTPException, status
@@ -103,7 +104,7 @@ async def test_webhook(webhook_id: uuid.UUID, tenant: TenantDep, db: DbDep) -> W
     if endpoint is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Webhook no encontrado")
 
-    payload: dict = {
+    payload: dict[str, Any] = {
         "event": "test",
         "webhook_id": str(webhook_id),
         "timestamp": datetime.now(UTC).isoformat(),
