@@ -10,7 +10,6 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from prometheus_fastapi_instrumentator import Instrumentator
 
 from crewlayer.api.middleware.audit import AuditLogMiddleware
 from crewlayer.api.middleware.ratelimit import check_rate_limit
@@ -130,13 +129,6 @@ app = FastAPI(
     dependencies=[Depends(check_rate_limit)],
 )
 setup_telemetry(app)
-
-# Instrument HTTP request metrics — exclude /metrics and /health from tracking
-Instrumentator(
-    excluded_handlers=["/metrics", "/health"],
-    should_ignore_untemplated=True,
-).instrument(app)
-# Note: .expose() is NOT called — /metrics is handled below with auth
 
 app.add_middleware(
     CORSMiddleware,
