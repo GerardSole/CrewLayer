@@ -219,6 +219,9 @@ npm run dev      # http://localhost:5173  — proxies /v1/* to localhost:8000
 
 CrewLayer ships a native desktop application for macOS, Windows, and Linux. It bundles the full backend — PostgreSQL, Redis, and FastAPI — into a single executable: no Docker, no manual setup.
 
+<img width="1280" height="820" alt="image" src="https://github.com/user-attachments/assets/ca53b167-644d-44df-9395-4a4b7054a594" />
+
+
 **Download:** [GitHub Releases](https://github.com/GerardSole/CrewLayer/releases/latest) — latest: **v0.1.0-desktop**
 
 The Electron app lives in `desktop/`. On first launch it initialises the embedded database, runs migrations automatically, and opens the dashboard in the app window. For server deployments or team use, the Docker Compose path is the recommended option.
