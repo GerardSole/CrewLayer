@@ -17,8 +17,9 @@ dist/*.egg
 venv/
 env/
 
-# Secrets — keep .env.example, ignore real env files
+# Secrets
 .env
+.env.example
 *.env.local
 
 # ── Tests & coverage ──────────────────────────────────────────────────────────
